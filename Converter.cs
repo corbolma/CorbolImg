@@ -16,6 +16,8 @@ namespace AppImg
         public ImageInfo Info;
         public bool Unsupported;
         public ListViewItem Row;
+        public long Bytes;
+        public long Estimate = -1;   // peso previsto con le opzioni attuali (-1 = non ancora calcolato, -2 = errore)
     }
 
     // Convertitore: molte immagini insieme in un altro formato, con qualità, riduzione e cartella di destinazione.
@@ -27,7 +29,7 @@ namespace AppImg
         // Elenco e anteprima
         readonly SplitContainer split = new SplitContainer();
         readonly ListView list = new ListView();
-        readonly ColumnHeader chFile = new ColumnHeader(), chFmt = new ColumnHeader(), chDim = new ColumnHeader(), chBytes = new ColumnHeader(), chState = new ColumnHeader();
+        readonly ColumnHeader chFile = new ColumnHeader(), chFmt = new ColumnHeader(), chDim = new ColumnHeader(), chBytes = new ColumnHeader(), chEst = new ColumnHeader(), chState = new ColumnHeader();
         readonly Label dropHint = new Label();
         readonly PictureBox preview = new PictureBox();
         readonly Label previewInfo = new Label();
@@ -83,7 +85,8 @@ namespace AppImg
             DragDrop += OnDragDrop;
             KeyPreview = true;
             KeyDown += OnKeyDown;
-            FormClosing += delegate { cancel = true; SaveOptions(); };
+            FormClosing += delegate { cancel = true; estGen++; SaveOptions(); };
+            estTimer.Tick += delegate { estTimer.Stop(); StartEstimate(); };
             Load += delegate
             {
                 // I minimi si impostano qui: prima la finestra non ha ancora la sua larghezza
@@ -140,9 +143,9 @@ namespace AppImg
             list.FullRowSelect = true;
             list.HideSelection = false;
             list.AllowDrop = true;
-            list.Columns.AddRange(new[] { chFile, chFmt, chDim, chBytes, chState });
-            chFile.Width = S(220); chFmt.Width = S(70); chDim.Width = S(90); chBytes.Width = S(70); chState.Width = S(160);
-            chBytes.TextAlign = HorizontalAlignment.Right;
+            list.Columns.AddRange(new[] { chFile, chFmt, chDim, chBytes, chEst, chState });
+            chFile.Width = S(200); chFmt.Width = S(66); chDim.Width = S(86); chBytes.Width = S(66); chEst.Width = S(76); chState.Width = S(160);
+            chBytes.TextAlign = chEst.TextAlign = HorizontalAlignment.Right;
             list.DragEnter += OnDragEnter;
             list.DragDrop += OnDragDrop;
             list.SelectedIndexChanged += delegate { ShowPreview(); };
@@ -177,7 +180,7 @@ namespace AppImg
             preview.BorderStyle = BorderStyle.FixedSingle;
             previewInfo.Dock = DockStyle.Bottom;
             previewInfo.AutoSize = false;
-            previewInfo.Height = S(40);
+            previewInfo.Height = S(58);
             previewInfo.TextAlign = ContentAlignment.MiddleLeft;
             previewInfo.ForeColor = Color.DimGray;
             previewInfo.AutoEllipsis = true;
@@ -222,7 +225,7 @@ namespace AppImg
             cbFormat.Width = S(170);
             cbFormat.Margin = new Padding(0, S(3), 0, S(3));
             foreach (var f in Imaging.Outputs()) cbFormat.Items.Add(f);
-            cbFormat.SelectedIndexChanged += delegate { UpdateQualityState(); };
+            cbFormat.SelectedIndexChanged += delegate { UpdateQualityState(); ScheduleEstimate(); };
 
             tbQuality.Minimum = 1;
             tbQuality.Maximum = 100;
@@ -230,11 +233,12 @@ namespace AppImg
             tbQuality.AutoSize = false;
             tbQuality.Size = new Size(S(160), S(28));
             tbQuality.Margin = new Padding(0, S(2), 0, 0);
-            tbQuality.ValueChanged += delegate { lQualityVal.Text = tbQuality.Value.ToString(); };
+            tbQuality.ValueChanged += delegate { lQualityVal.Text = tbQuality.Value.ToString(); ScheduleEstimate(); };
 
             chkResize.AutoSize = true;
             chkResize.Margin = new Padding(0, S(6), S(4), 0);
-            chkResize.CheckedChanged += delegate { numMax.Enabled = chkResize.Checked; };
+            chkResize.CheckedChanged += delegate { numMax.Enabled = chkResize.Checked; ScheduleEstimate(); };
+            numMax.ValueChanged += delegate { if (chkResize.Checked) ScheduleEstimate(); };
             numMax.Minimum = 16;
             numMax.Maximum = 20000;
             numMax.Increment = 100;
@@ -296,7 +300,7 @@ namespace AppImg
         // La colonna "Stato" occupa lo spazio rimasto, senza barra di scorrimento orizzontale
         void FitLastColumn()
         {
-            int used = chFile.Width + chFmt.Width + chDim.Width + chBytes.Width;
+            int used = chFile.Width + chFmt.Width + chDim.Width + chBytes.Width + chEst.Width;
             int free = list.ClientSize.Width - used;
             if (free > S(80)) chState.Width = free;
         }
@@ -320,6 +324,7 @@ namespace AppImg
             chFmt.Text = L.T("Formato", "Format");
             chDim.Text = L.T("Dimensioni", "Dimensions");
             chBytes.Text = L.T("Peso", "Size");
+            chEst.Text = L.T("Previsto", "Estimated");
             chState.Text = L.T("Stato", "Status");
             dropHint.Text = L.T("Trascina qui immagini o cartelle\noppure clicca per sceglierle",
                                 "Drag images or folders here\nor click to choose them");
@@ -506,10 +511,9 @@ namespace AppImg
             foreach (var p in add)
             {
                 var it = new Item { Path = p };
-                it.Row = new ListViewItem(new[] { Path.GetFileName(p), "", "", "", "" }) { Tag = it, ToolTipText = p };
-                long len = 0;
-                try { len = new FileInfo(p).Length; } catch { }
-                it.Row.SubItems[3].Text = Util.FormatBytes(len);
+                it.Row = new ListViewItem(new[] { Path.GetFileName(p), "", "", "", "", "" }) { Tag = it, ToolTipText = p };
+                try { it.Bytes = new FileInfo(p).Length; } catch { }
+                it.Row.SubItems[3].Text = Util.FormatBytes(it.Bytes);
                 items.Add(it);
                 list.Items.Add(it.Row);
                 lock (infoQueue) infoQueue.Enqueue(it);
@@ -520,6 +524,7 @@ namespace AppImg
             if (list.SelectedItems.Count == 0 && list.Items.Count > 0) list.Items[list.Items.Count - add.Count].Selected = true;
             UpdateStatusIdle();
             StartInfoLoader();
+            ScheduleEstimate();
         }
 
         // Elenca i file di una cartella e sottocartelle, saltando quelle non accessibili.
@@ -588,10 +593,11 @@ namespace AppImg
                 it.Row.SubItems[1].Text = fmt;
                 it.Row.SubItems[2].Text = it.Info.Width + " × " + it.Info.Height;
             }
-            if (state != null) it.Row.SubItems[4].Text = state;
+            it.Row.SubItems[4].Text = it.Unsupported ? "" : it.Estimate >= 0 ? "≈ " + Util.FormatBytes(it.Estimate) : it.Estimate == -2 ? "—" : "…";
+            if (state != null) it.Row.SubItems[5].Text = state;
             else if (it.Unsupported)
             {
-                it.Row.SubItems[4].Text = L.T("Formato non leggibile", "Unreadable format");
+                it.Row.SubItems[5].Text = L.T("Formato non leggibile", "Unreadable format");
                 it.Row.ForeColor = Color.FromArgb(190, 60, 0);
             }
         }
@@ -612,12 +618,14 @@ namespace AppImg
             else ShowPreview();
             PlaceHint();
             UpdateStatusIdle();
+            ScheduleEstimate();
         }
 
         void ClearAll()
         {
             if (converting) return;
             lock (infoQueue) infoQueue.Clear();
+            estGen++;
             items.Clear();
             list.Items.Clear();
             ShowPreview();
@@ -685,10 +693,92 @@ namespace AppImg
             {
                 s += "\n" + it.Info.Format + "  ·  " + it.Info.Width + " × " + it.Info.Height + " px  ·  " + it.Row.SubItems[3].Text;
                 if (it.Info.Frames > 1) s += "  ·  " + L.F("{0} fotogrammi/pagine (si converte il primo)", "{0} frames/pages (the first is converted)", it.Info.Frames);
+                var f = SelectedFormat;
+                if (it.Estimate >= 0 && f != null)
+                    s += "\n" + L.F("Dopo la conversione in {0}: ≈ {1}", "After converting to {0}: ≈ {1}", f.Name, Util.FormatBytes(it.Estimate)) + Change(it.Bytes, it.Estimate);
+                else if (it.Estimate == -1 && f != null) s += "\n" + L.T("Calcolo del peso previsto...", "Estimating the new size...");
             }
             else if (it.Unsupported) s += "\n" + L.T("Windows non sa leggere questo file. Per HEIC, WebP, AVIF o RAW installa l'estensione dal Microsoft Store.",
                                                      "Windows cannot read this file. For HEIC, WebP, AVIF or RAW install the extension from the Microsoft Store.");
             previewInfo.Text = s;
+        }
+
+        // ===================== Peso previsto =====================
+
+        readonly Timer estTimer = new Timer { Interval = 300 };
+        volatile int estGen;
+        // Ultime immagini già lette e ridotte: muovendo il cursore della qualità si ricodificano senza rileggerle
+        readonly Dictionary<string, System.Windows.Media.Imaging.BitmapSource> prepared = new Dictionary<string, System.Windows.Media.Imaging.BitmapSource>();
+        readonly Queue<string> preparedOrder = new Queue<string>();
+
+        static string Change(long before, long after)
+        {
+            if (before <= 0) return "";
+            double pct = (after - before) * 100.0 / before;
+            return "  (" + (pct >= 0 ? "+" : "−") + Math.Abs(pct).ToString(Math.Abs(pct) < 10 ? "0.#" : "0") + "%)";
+        }
+
+        // Le opzioni sono cambiate: si ricalcola dopo una breve pausa (trascinando il cursore non si ricalcola a ogni passo).
+        void ScheduleEstimate()
+        {
+            if (converting || cbFormat.SelectedItem == null) return;
+            estGen++;
+            foreach (var it in items) { it.Estimate = -1; RefreshRow(it, null); }
+            ShowPreviewInfo();
+            UpdateStatusIdle();
+            estTimer.Stop();
+            estTimer.Start();
+        }
+
+        // Codifica in memoria ogni immagine con le opzioni attuali: prima quella selezionata, poi le altre in ordine.
+        void StartEstimate()
+        {
+            var f = SelectedFormat;
+            if (f == null || converting) return;
+            int gen = estGen, quality = tbQuality.Value, maxSide = chkResize.Checked ? (int)numMax.Value : 0;
+            var sel = SelectedItem;
+            var todo = items.Where(i => !i.Unsupported).OrderBy(i => i == sel ? 0 : 1).ToList();
+            Program.RunSta(delegate
+            {
+                foreach (var it in todo)
+                {
+                    if (gen != estGen) return;
+                    long size;
+                    try
+                    {
+                        string key = it.Path + "|" + maxSide;
+                        System.Windows.Media.Imaging.BitmapSource src;
+                        lock (prepared)
+                            prepared.TryGetValue(key, out src);
+                        if (src == null)
+                        {
+                            src = Imaging.Prepare(it.Path, maxSide);
+                            lock (prepared)
+                            {
+                                prepared[key] = src;
+                                preparedOrder.Enqueue(key);
+                                while (preparedOrder.Count > 3) prepared.Remove(preparedOrder.Dequeue());
+                            }
+                        }
+                        if (gen != estGen) return;
+                        size = Imaging.EstimateSize(src, f, quality);
+                    }
+                    catch { size = -2; }
+                    var item = it;
+                    try
+                    {
+                        BeginInvoke(new Action(delegate
+                        {
+                            if (gen != estGen || !items.Contains(item)) return;
+                            item.Estimate = size;
+                            RefreshRow(item, null);
+                            if (item == SelectedItem) ShowPreviewInfo();
+                            UpdateStatusIdle();
+                        }));
+                    }
+                    catch { return; }
+                }
+            });
         }
 
         // ===================== Conversione =====================
@@ -696,10 +786,28 @@ namespace AppImg
         void UpdateStatusIdle()
         {
             if (converting) return;
-            int n = items.Count(i => !i.Unsupported);
-            status.Text = items.Count == 0 ? L.T("Nessuna immagine in elenco.", "No images in the list.")
+            var ok = items.Where(i => !i.Unsupported).ToList();
+            int n = ok.Count;
+            string text = items.Count == 0 ? L.T("Nessuna immagine in elenco.", "No images in the list.")
                         : n == 1 ? L.T("1 immagine da convertire.", "1 image to convert.")
                         : L.F("{0} immagini da convertire.", "{0} images to convert.", n);
+            if (n > 0)
+            {
+                var done = ok.Where(i => i.Estimate >= 0).ToList();
+                long now = ok.Sum(i => i.Bytes), est = done.Sum(i => i.Estimate);
+                if (done.Count == n)
+                    text += "  " + L.F("Peso previsto: ≈ {0} (ora {1})", "Estimated size: ≈ {0} (now {1})", Util.FormatBytes(est), Util.FormatBytes(now)) + Change(now, est);
+                else if (done.Count > 0)
+                {
+                    // Stima parziale: proporzione sui file già calcolati
+                    long partNow = done.Sum(i => i.Bytes);
+                    long guess = partNow > 0 ? (long)((double)est / partNow * now) : est;
+                    text += "  " + L.F("Peso previsto: ≈ {0} (ora {1}), calcolo {2} di {3}...", "Estimated size: ≈ {0} (now {1}), estimating {2} of {3}...",
+                                       Util.FormatBytes(guess), Util.FormatBytes(now), done.Count, n);
+                }
+                else text += "  " + L.T("Calcolo del peso previsto...", "Estimating the new size...");
+            }
+            status.Text = text;
             btnConvert.Enabled = n > 0 || converting;
         }
 
@@ -743,6 +851,7 @@ namespace AppImg
                 }
             }
             SaveOptions();
+            estGen++; // la stima si ferma durante la conversione
             int quality = tbQuality.Value, maxSide = chkResize.Checked ? (int)numMax.Value : 0;
             bool overwrite = chkOverwrite.Checked, openFolder = chkOpenFolder.Checked;
 

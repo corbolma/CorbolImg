@@ -389,6 +389,12 @@ namespace AppImg
         // quarterTurns: rotazione in senso orario a passi di 90° (quella scelta nel visualizzatore).
         public static void Convert(string src, string dest, OutputFormat f, int quality, int maxSide, int quarterTurns = 0)
         {
+            Save(Prepare(src, maxSide, quarterTurns), dest, f, quality);
+        }
+
+        // Immagine pronta da salvare: letta, ruotata e ridotta come richiesto.
+        public static BitmapSource Prepare(string src, int maxSide, int quarterTurns = 0)
+        {
             var s = Load(src);
             quarterTurns = ((quarterTurns % 4) + 4) % 4;
             if (quarterTurns != 0)
@@ -402,7 +408,47 @@ namespace AppImg
                 using (var r = Scale(g, Fit(s.PixelWidth, s.PixelHeight, maxSide)))
                     s = FromGdi(r, s.DpiX, s.DpiY);
             }
-            Save(s, dest, f, quality);
+            return s;
+        }
+
+        // Peso che avrebbe il file: l'immagine viene codificata davvero, ma i byte vengono solo contati.
+        public static long EstimateSize(BitmapSource s, OutputFormat f, int quality)
+        {
+            using (var cs = new CountingStream())
+            {
+                Write(s, cs, f, Math.Max(1, Math.Min(100, quality)));
+                return cs.Length;
+            }
+        }
+
+        // Stream che non conserva nulla: conta soltanto i byte scritti.
+        class CountingStream : Stream
+        {
+            long len, pos;
+            public override bool CanRead { get { return false; } }
+            public override bool CanSeek { get { return true; } }
+            public override bool CanWrite { get { return true; } }
+            public override long Length { get { return len; } }
+            public override long Position { get { return pos; } set { pos = value; } }
+            public override void Flush() { }
+            public override int Read(byte[] buffer, int offset, int count) { throw new NotSupportedException(); }
+            public override long Seek(long offset, SeekOrigin origin)
+            {
+                pos = origin == SeekOrigin.Begin ? offset : origin == SeekOrigin.Current ? pos + offset : len + offset;
+                return pos;
+            }
+            public override void SetLength(long value) { len = value; }
+            public override void Write(byte[] buffer, int offset, int count) { pos += count; if (pos > len) len = pos; }
+        }
+
+        static void Write(BitmapSource s, Stream output, OutputFormat f, int quality)
+        {
+            switch (f.Id)
+            {
+                case "ico": WriteIco(s, output); break;
+                case "pdf": WritePdf(s, output, quality); break;
+                default: Encoder(s, f, quality).Save(output); break;
+            }
         }
 
         public static void Save(BitmapSource s, string dest, OutputFormat f, int quality)
@@ -412,14 +458,7 @@ namespace AppImg
             try
             {
                 using (var fs = new FileStream(tmp, FileMode.CreateNew, FileAccess.Write))
-                {
-                    switch (f.Id)
-                    {
-                        case "ico": WriteIco(s, fs); break;
-                        case "pdf": WritePdf(s, fs, quality); break;
-                        default: Encoder(s, f, quality).Save(fs); break;
-                    }
-                }
+                    Write(s, fs, f, quality);
                 // Il file finale viene sostituito solo a scrittura completata
                 if (File.Exists(dest)) File.Delete(dest);
                 File.Move(tmp, dest);
