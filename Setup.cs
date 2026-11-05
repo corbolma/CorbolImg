@@ -418,6 +418,8 @@ namespace AppImg.Setup
             btnInstall = new Button { Text = action, Location = new Point(240, 256), MinimumSize = new Size(120, 30), AutoSize = true };
             btnCancel = new Button { Text = L.T("Annulla", "Cancel"), Location = new Point(366, 256), MinimumSize = new Size(90, 30), AutoSize = true, DialogResult = DialogResult.Cancel };
             btnInstall.Click += delegate { DoInstall(); };
+            // DialogResult da solo non chiude: l'installer è la finestra principale, non un dialogo
+            btnCancel.Click += delegate { Close(); };
             AcceptButton = btnInstall;
             CancelButton = btnCancel;
 
