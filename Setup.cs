@@ -1,7 +1,7 @@
 // Installer di AppImg: un solo exe che contiene AppImg.exe.
 // Installa per l'utente corrente (nessun permesso di amministratore) in %LOCALAPPDATA%\Programs\AppImg.
 //   AppImg-Setup.exe              -> finestra di installazione / aggiornamento
-//   AppImg-Setup.exe /silent      -> installazione silenziosa (menu Start e "Invia a")
+//   AppImg-Setup.exe /silent      -> installazione silenziosa (menu Start, "Invia a", "Apri con")
 //   Uninstall.exe /uninstall      -> disinstallazione (registrata in Impostazioni > App)
 using System;
 using System.Diagnostics;
@@ -36,7 +36,7 @@ namespace AppImg.Setup
                     // In silenzioso non si torna mai a una versione più vecchia, salvo /force.
                     var inst = Installer.InstalledVersion();
                     if (inst != null && inst > Installer.Current && !has("/force")) return 3;
-                    Installer.Install(Installer.DesktopShortcutExists(), true, false);
+                    Installer.Install(Installer.DesktopShortcutExists(), Installer.SendToEnabled(), Installer.AssociationsEnabled(), false);
                     return 0;
                 }
                 Application.Run(new SetupForm());
@@ -88,6 +88,68 @@ namespace AppImg.Setup
         public static bool DesktopShortcutExists() { return File.Exists(DesktopLnk); }
         // "Invia a" attivo di default; in un aggiornamento si mantiene la scelta fatta
         public static bool SendToEnabled() { return InstalledVersion() == null || File.Exists(SendToLnk); }
+        // Registrazione come visualizzatore ("Apri con", App predefinite): attiva di default, in un aggiornamento si mantiene
+        public static bool AssociationsEnabled()
+        {
+            using (var k = Registry.CurrentUser.OpenSubKey(UninstKey))
+                return k == null || !(k.GetValue("OpenWith") is int) || (int)k.GetValue("OpenWith") != 0;
+        }
+
+        // ---------- associazione ai tipi di immagine (solo per l'utente corrente) ----------
+        const string ClassesKey = @"Software\Classes";
+        const string ProgId = "AppImg.Image";
+        const string CapabilitiesKey = @"Software\AppImg\Capabilities";
+        static readonly string[] ImageExts =
+        {
+            ".jpg", ".jpeg", ".jpe", ".jfif", ".png", ".gif", ".bmp", ".dib", ".tif", ".tiff", ".ico", ".webp", ".heic", ".heif",
+            ".avif", ".jxr", ".wdp", ".hdp", ".jxl", ".dng", ".cr2", ".cr3", ".nef", ".nrw", ".arw", ".srf", ".sr2", ".orf",
+            ".rw2", ".raf", ".pef", ".srw", ".erf", ".kdc", ".mrw", ".3fr", ".rwl", ".iiq"
+        };
+
+        [DllImport("shell32.dll")] static extern void SHChangeNotify(int eventId, int flags, IntPtr item1, IntPtr item2);
+
+        // AppImg compare in "Apri con" e in Impostazioni > App predefinite. L'app predefinita la sceglie l'utente:
+        // Windows non permette ai programmi di impostarla da soli.
+        static void RegisterAssociations()
+        {
+            string open = "\"" + ExePath + "\" \"%1\"";
+            using (var k = Registry.CurrentUser.CreateSubKey(ClassesKey + "\\" + ProgId))
+            {
+                k.SetValue("", L.T("Immagine", "Image"));
+                k.SetValue("FriendlyTypeName", L.T("Immagine", "Image"));
+                using (var i = k.CreateSubKey("DefaultIcon")) i.SetValue("", "\"" + ExePath + "\",0");
+                using (var c = k.CreateSubKey(@"shell\open\command")) c.SetValue("", open);
+            }
+            using (var k = Registry.CurrentUser.CreateSubKey(ClassesKey + @"\Applications\AppImg.exe"))
+            {
+                k.SetValue("FriendlyAppName", "AppImg");
+                using (var c = k.CreateSubKey(@"shell\open\command")) c.SetValue("", open);
+                using (var t = k.CreateSubKey("SupportedTypes")) foreach (var e in ImageExts) t.SetValue(e, "");
+            }
+            foreach (var e in ImageExts)
+                using (var k = Registry.CurrentUser.CreateSubKey(ClassesKey + "\\" + e + @"\OpenWithProgids"))
+                    k.SetValue(ProgId, new byte[0], RegistryValueKind.None);
+            using (var k = Registry.CurrentUser.CreateSubKey(CapabilitiesKey))
+            {
+                k.SetValue("ApplicationName", "AppImg");
+                k.SetValue("ApplicationDescription", L.T("Visualizzatore di immagini con convertitore", "Image viewer and converter"));
+                k.SetValue("ApplicationIcon", "\"" + ExePath + "\",0");
+                using (var f = k.CreateSubKey("FileAssociations")) foreach (var e in ImageExts) f.SetValue(e, ProgId);
+            }
+            using (var k = Registry.CurrentUser.CreateSubKey(@"Software\RegisteredApplications")) k.SetValue("AppImg", CapabilitiesKey);
+            SHChangeNotify(0x08000000, 0, IntPtr.Zero, IntPtr.Zero); // SHCNE_ASSOCCHANGED
+        }
+
+        static void UnregisterAssociations()
+        {
+            try { Registry.CurrentUser.DeleteSubKeyTree(ClassesKey + "\\" + ProgId, false); } catch { }
+            try { Registry.CurrentUser.DeleteSubKeyTree(ClassesKey + @"\Applications\AppImg.exe", false); } catch { }
+            try { Registry.CurrentUser.DeleteSubKeyTree(@"Software\AppImg", false); } catch { }
+            try { using (var k = Registry.CurrentUser.OpenSubKey(@"Software\RegisteredApplications", true)) if (k != null) k.DeleteValue("AppImg", false); } catch { }
+            foreach (var e in ImageExts)
+                try { using (var k = Registry.CurrentUser.OpenSubKey(ClassesKey + "\\" + e + @"\OpenWithProgids", true)) if (k != null) k.DeleteValue(ProgId, false); } catch { }
+            SHChangeNotify(0x08000000, 0, IntPtr.Zero, IntPtr.Zero);
+        }
 
         // Chiude AppImg se è aperta: prima con garbo (chiusura della finestra), poi forzando.
         public static void CloseRunning()
@@ -103,7 +165,7 @@ namespace AppImg.Setup
                 try { p.Kill(); p.WaitForExit(3000); } catch { }
         }
 
-        public static void Install(bool desktop, bool sendTo, bool launch)
+        public static void Install(bool desktop, bool sendTo, bool associate, bool launch)
         {
             CloseRunning();
             Directory.CreateDirectory(InstallDir);
@@ -121,12 +183,15 @@ namespace AppImg.Setup
             if (!string.Equals(Path.GetFullPath(self), Path.GetFullPath(UninstallerPath), StringComparison.OrdinalIgnoreCase))
                 File.Copy(self, UninstallerPath, true);
 
-            string desc = L.T("Converte immagini tra formati diversi", "Converts images between formats");
-            CreateShortcut(StartMenuLnk, ExePath, desc);
-            if (desktop) CreateShortcut(DesktopLnk, ExePath, desc);
+            string desc = L.T("Visualizza e converte immagini", "View and convert images");
+            CreateShortcut(StartMenuLnk, ExePath, "", desc);
+            if (desktop) CreateShortcut(DesktopLnk, ExePath, "", desc);
             else if (File.Exists(DesktopLnk)) File.Delete(DesktopLnk);
-            if (sendTo) CreateShortcut(SendToLnk, ExePath, desc);
+            // "Invia a > AppImg" apre direttamente il convertitore con i file selezionati
+            if (sendTo) CreateShortcut(SendToLnk, ExePath, "/convert", L.T("Converti le immagini selezionate con AppImg", "Convert the selected images with AppImg"));
             else if (File.Exists(SendToLnk)) File.Delete(SendToLnk);
+            if (associate) RegisterAssociations();
+            else UnregisterAssociations();
 
             using (var k = Registry.CurrentUser.CreateSubKey(UninstKey))
             {
@@ -144,6 +209,7 @@ namespace AppImg.Setup
                 k.SetValue("EstimatedSize", (int)(new FileInfo(ExePath).Length / 1024 + new FileInfo(UninstallerPath).Length / 1024), RegistryValueKind.DWord);
                 k.SetValue("NoModify", 1, RegistryValueKind.DWord);
                 k.SetValue("NoRepair", 1, RegistryValueKind.DWord);
+                k.SetValue("OpenWith", associate ? 1 : 0, RegistryValueKind.DWord); // scelta ricordata negli aggiornamenti
             }
 
             if (launch) Process.Start(new ProcessStartInfo(ExePath) { WorkingDirectory = InstallDir });
@@ -159,6 +225,7 @@ namespace AppImg.Setup
             foreach (var f in new[] { StartMenuLnk, DesktopLnk, SendToLnk })
                 try { if (File.Exists(f)) File.Delete(f); } catch { }
             try { Registry.CurrentUser.DeleteSubKeyTree(UninstKey, false); } catch { }
+            UnregisterAssociations();
             try
             {
                 string settings = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AppImg");
@@ -182,16 +249,17 @@ namespace AppImg.Setup
         }
 
         // Deve coincidere con Program.AppUserModelId in AppImg.cs
-        const string AppUserModelId = "AppImg.Converter";
+        const string AppUserModelId = "AppImg.Viewer";
 
         // Crea il collegamento con l'AppUserModelID, così l'icona fissata alla barra corrisponde alla finestra aperta.
-        static void CreateShortcut(string lnkPath, string target, string description)
+        static void CreateShortcut(string lnkPath, string target, string args, string description)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(lnkPath));
             var link = (IShellLinkW)new CShellLink();
             try
             {
                 link.SetPath(target);
+                if (args.Length > 0) link.SetArguments(args);
                 link.SetWorkingDirectory(Path.GetDirectoryName(target));
                 link.SetDescription(description);
                 link.SetIconLocation(target, 0);
@@ -256,7 +324,7 @@ namespace AppImg.Setup
 
     class SetupForm : Form
     {
-        readonly CheckBox cbSendTo, cbDesktop, cbLaunch;
+        readonly CheckBox cbAssoc, cbSendTo, cbDesktop, cbLaunch;
         readonly Button btnInstall, btnCancel;
         readonly Label lblStatus;
 
@@ -315,8 +383,8 @@ namespace AppImg.Setup
             };
             var sub = new Label
             {
-                Text = L.T("Converte immagini tra formati diversi: JPEG, PNG, HEIC, WebP, TIFF, GIF, BMP, ICO, PDF e altri",
-                           "Converts images between formats: JPEG, PNG, HEIC, WebP, TIFF, GIF, BMP, ICO, PDF and more"),
+                Text = L.T("Visualizzatore di immagini, con convertitore: JPEG, PNG, HEIC, WebP, TIFF, GIF, RAW, ICO, PDF e altri",
+                           "Image viewer, with converter: JPEG, PNG, HEIC, WebP, TIFF, GIF, RAW, ICO, PDF and more"),
                 ForeColor = Color.FromArgb(237, 228, 255),
                 AutoSize = true, MaximumSize = new Size(370, 0), Location = new Point(90, 50), BackColor = Color.Transparent
             };
@@ -333,6 +401,11 @@ namespace AppImg.Setup
                 Text = Installer.InstallDir, AutoEllipsis = true
             };
 
+            cbAssoc = new CheckBox
+            {
+                Text = L.T("Proponi AppImg in \"Apri con\" per le immagini", "Offer AppImg in \"Open with\" for images"),
+                Location = new Point(22, 164), AutoSize = true, Checked = Installer.AssociationsEnabled()
+            };
             cbSendTo = new CheckBox
             {
                 Text = L.T("Aggiungi AppImg al menu \"Invia a\" di Esplora file", "Add AppImg to the File Explorer \"Send to\" menu"),
@@ -369,7 +442,7 @@ namespace AppImg.Setup
             site.LinkClicked += delegate { OpenUrl(AppVersion.RepoUrl); };
             footer.Controls.AddRange(new Control[] { credits, site });
 
-            Controls.AddRange(new Control[] { header, info, path, cbSendTo, cbDesktop, cbLaunch, lblStatus, btnInstall, btnCancel, footer });
+            Controls.AddRange(new Control[] { header, info, path, cbAssoc, cbSendTo, cbDesktop, cbLaunch, lblStatus, btnInstall, btnCancel, footer });
 
             // Dispone i controlli sotto il testo informativo, qualunque sia la sua altezza (righe, DPI)
             Load += delegate
@@ -378,7 +451,7 @@ namespace AppImg.Setup
                 info.Top = header.Bottom + 14;
                 int y = info.Bottom + 6;
                 path.Top = y; y = path.Bottom + 12;
-                foreach (var cb in new[] { cbSendTo, cbDesktop, cbLaunch }) { cb.Top = y; y = cb.Bottom + 4; }
+                foreach (var cb in new[] { cbAssoc, cbSendTo, cbDesktop, cbLaunch }) { cb.Top = y; y = cb.Bottom + 4; }
                 y += 14;
                 btnInstall.Top = btnCancel.Top = y;
                 // Pulsanti allineati a destra: si allargano se la traduzione è lunga
@@ -404,18 +477,25 @@ namespace AppImg.Setup
             Application.DoEvents();
             try
             {
-                Installer.Install(cbDesktop.Checked, cbSendTo.Checked, cbLaunch.Checked);
+                Installer.Install(cbDesktop.Checked, cbSendTo.Checked, cbAssoc.Checked, cbLaunch.Checked);
                 Cursor = Cursors.Default;
-                MessageBox.Show(this,
-                    L.T("AppImg è stata installata.\n\n" +
-                        "La trovi nel menu Start. Puoi anche trascinare le immagini sulla sua finestra, oppure " +
-                        "selezionarle in Esplora file → tasto destro → Invia a → AppImg.\n\n" +
+                string done = L.T("AppImg è stata installata.\n\n" +
+                        "La trovi nel menu Start. Per convertire più immagini: selezionale in Esplora file → tasto destro → " +
+                        "Invia a → AppImg.\n\n" +
                         "Per disinstallarla: Impostazioni → App → App installate → AppImg.",
                         "AppImg has been installed.\n\n" +
-                        "You can find it in the Start menu. You can also drag images onto its window, or " +
-                        "select them in File Explorer → right-click → Send to → AppImg.\n\n" +
-                        "To uninstall it: Settings → Apps → Installed apps → AppImg."),
-                    "AppImg", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        "You can find it in the Start menu. To convert several images: select them in File Explorer → right-click → " +
+                        "Send to → AppImg.\n\n" +
+                        "To uninstall it: Settings → Apps → Installed apps → AppImg.");
+                if (cbAssoc.Checked)
+                {
+                    // Windows non permette ai programmi di diventare predefiniti da soli: si apre la pagina giusta delle Impostazioni
+                    if (MessageBox.Show(this, done + "\n\n" + L.T("Vuoi aprire le immagini con AppImg quando fai doppio clic? Si aprirà Impostazioni → App predefinite: scegli AppImg per i tipi di file che vuoi.",
+                                                                  "Do you want images to open in AppImg when you double-click them? Settings → Default apps will open: choose AppImg for the file types you want."),
+                            "AppImg", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
+                        OpenUrl("ms-settings:defaultapps?registeredAppUser=AppImg");
+                }
+                else MessageBox.Show(this, done, "AppImg", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 Close();
             }
             catch (Exception ex)

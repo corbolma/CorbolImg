@@ -199,8 +199,15 @@ namespace AppImg
         // Immagine completa, già raddrizzata secondo l'orientamento EXIF.
         public static BitmapSource Load(string path)
         {
+            ImageInfo info;
+            return Load(path, out info);
+        }
+
+        public static BitmapSource Load(string path, out ImageInfo info)
+        {
             var d = Open(path, BitmapCacheOption.OnLoad);
             var f = MainFrame(d);
+            info = new ImageInfo { Format = FormatName(d), Frames = d.Frames.Count };
             BitmapSource s = f;
             switch (Orientation(f))
             {
@@ -213,6 +220,8 @@ namespace AppImg
                 case 8: s = Rotate(s, 270); break;
             }
             s.Freeze();
+            info.Width = s.PixelWidth;
+            info.Height = s.PixelHeight;
             return s;
         }
 
@@ -229,12 +238,164 @@ namespace AppImg
             using (big) return Scale(big, Fit(w, h, maxSide));
         }
 
+        // ---------- visualizzazione ----------
+
+        // Immagine pronta per lo schermo: bitmap GDI+ (o GIF animata) più le informazioni sul file.
+        public class Picture : IDisposable
+        {
+            public Gdi.Image Image;
+            public bool Animated, HasAlpha;
+            public ImageInfo Info;
+            public long Bytes;
+            Stream keep; // le GIF animate leggono i fotogrammi dallo stream: deve restare aperto
+
+            public void Dispose()
+            {
+                if (Image != null) { Image.Dispose(); Image = null; }
+                if (keep != null) { keep.Dispose(); keep = null; }
+            }
+
+            // Carica per lo schermo; le immagini enormi vengono ridotte a maxSide (in Info restano le dimensioni vere).
+            public static Picture Load(string path, int maxSide)
+            {
+                var p = new Picture();
+                try { p.Bytes = new FileInfo(path).Length; } catch { }
+                if (string.Equals(Path.GetExtension(path), ".gif", StringComparison.OrdinalIgnoreCase))
+                {
+                    MemoryStream ms = null;
+                    try
+                    {
+                        ms = new MemoryStream(File.ReadAllBytes(path));
+                        var img = Gdi.Image.FromStream(ms);
+                        var dim = new GdiImaging.FrameDimension(img.FrameDimensionsList[0]);
+                        int n = img.GetFrameCount(dim);
+                        if (n > 1)
+                        {
+                            p.Image = img; p.Animated = true; p.HasAlpha = true; p.keep = ms;
+                            p.Info = new ImageInfo { Format = "GIF", Width = img.Width, Height = img.Height, Frames = n };
+                            return p;
+                        }
+                        img.Dispose();
+                    }
+                    catch { }
+                    if (ms != null && p.keep == null) ms.Dispose();
+                }
+                ImageInfo info;
+                var s = Imaging.Load(path, out info);
+                p.Info = info;
+                var bmp = ToGdi(s);
+                p.HasAlpha = AnyTransparent(bmp);
+                if (Math.Max(bmp.Width, bmp.Height) > maxSide)
+                    using (var big = bmp) bmp = Scale(big, Fit(big.Width, big.Height, maxSide));
+                p.Image = bmp;
+                return p;
+            }
+        }
+
+        static bool AnyTransparent(Gdi.Bitmap bmp)
+        {
+            var data = bmp.LockBits(new Gdi.Rectangle(0, 0, bmp.Width, bmp.Height), GdiImaging.ImageLockMode.ReadOnly, GdiImaging.PixelFormat.Format32bppArgb);
+            try
+            {
+                var row = new byte[bmp.Width * 4];
+                for (int y = 0; y < bmp.Height; y++)
+                {
+                    System.Runtime.InteropServices.Marshal.Copy(data.Scan0 + y * data.Stride, row, 0, row.Length);
+                    for (int i = 3; i < row.Length; i += 4) if (row[i] != 255) return true;
+                }
+                return false;
+            }
+            finally { bmp.UnlockBits(data); }
+        }
+
+        // Dati dello scatto (EXIF) per il pannello informazioni. Chiavi in inglese, tradotte dall'interfaccia.
+        public static List<KeyValuePair<string, string>> Details(string path)
+        {
+            var r = new List<KeyValuePair<string, string>>();
+            BitmapMetadata md = null;
+            try { md = MainFrame(Open(path, BitmapCacheOption.None)).Metadata as BitmapMetadata; } catch { }
+            if (md == null) return r;
+            var ci = CultureInfo.CurrentCulture;
+            Func<string, object> q = k => { try { return md.GetQuery(k); } catch { return null; } };
+            Action<string, string> add = (k, val) => { if (!string.IsNullOrWhiteSpace(val)) r.Add(new KeyValuePair<string, string>(k, val.Trim())); };
+            Func<object, double> num = o => { try { return o == null ? double.NaN : System.Convert.ToDouble(o, CultureInfo.InvariantCulture); } catch { return double.NaN; } };
+
+            try
+            {
+                DateTime dt;
+                string taken = md.DateTaken;
+                if (taken != null && DateTime.TryParse(taken, CultureInfo.InvariantCulture, DateTimeStyles.None, out dt)) add("Date taken", dt.ToString("g", ci));
+                else add("Date taken", taken);
+            }
+            catch { }
+            string make = null, model = null;
+            try { make = md.CameraManufacturer; } catch { }
+            try { model = md.CameraModel; } catch { }
+            if (!string.IsNullOrWhiteSpace(model))
+                add("Camera", !string.IsNullOrWhiteSpace(make) && !model.Trim().StartsWith(make.Trim(), StringComparison.OrdinalIgnoreCase) ? make.Trim() + " " + model.Trim() : model);
+            else add("Camera", make);
+
+            var parts = new List<string>();
+            double v = num(q("System.Photo.FNumber"));
+            if (v > 0) parts.Add("f/" + v.ToString("0.#", ci));
+            v = num(q("System.Photo.ExposureTime"));
+            if (v > 0) parts.Add(v < 1 ? "1/" + Math.Round(1 / v) + " s" : v.ToString("0.#", ci) + " s");
+            v = num(q("System.Photo.ISOSpeed"));
+            if (v > 0) parts.Add("ISO " + v.ToString("0", ci));
+            v = num(q("System.Photo.FocalLength"));
+            if (v > 0) parts.Add(v.ToString("0.#", ci) + " mm");
+            add("Exposure", string.Join("  ·  ", parts));
+            add("Lens", q("System.Photo.LensModel") as string);
+            try { add("Software", md.ApplicationName); } catch { }
+            try { add("Author", md.Author != null ? string.Join(", ", md.Author) : null); } catch { }
+            try { add("Title", md.Title); } catch { }
+
+            double[] lat = Gps(q, 2, "System.GPS.Latitude"), lon = Gps(q, 4, "System.GPS.Longitude");
+            if (lat != null && lon != null)
+            {
+                double la = lat[0] + lat[1] / 60 + lat[2] / 3600, lo = lon[0] + lon[1] / 60 + lon[2] / 3600;
+                string latRef = q("System.GPS.LatitudeRef") as string ?? q("/app1/ifd/gps/{ushort=1}") as string ?? q("/ifd/gps/{ushort=1}") as string ?? "N";
+                string lonRef = q("System.GPS.LongitudeRef") as string ?? q("/app1/ifd/gps/{ushort=3}") as string ?? q("/ifd/gps/{ushort=3}") as string ?? "E";
+                if (latRef.StartsWith("S")) la = -la;
+                if (lonRef.StartsWith("W")) lo = -lo;
+                add("Location", la.ToString("0.00000", CultureInfo.InvariantCulture) + ", " + lo.ToString("0.00000", CultureInfo.InvariantCulture));
+            }
+            return r;
+        }
+
+        // Gradi, minuti, secondi del GPS: dal nome del sistema o, se WPF non lo risolve, dai razionali EXIF grezzi.
+        static double[] Gps(Func<string, object> q, int tag, string name)
+        {
+            var d = q(name) as double[];
+            if (d != null && d.Length == 3) return d;
+            foreach (var path in new[] { "/app1/ifd/gps/{ushort=" + tag + "}", "/ifd/gps/{ushort=" + tag + "}" })
+            {
+                var raw = q(path) as ulong[];
+                if (raw == null || raw.Length != 3) continue;
+                var r = new double[3];
+                for (int i = 0; i < 3; i++)
+                {
+                    uint num = (uint)(raw[i] & 0xFFFFFFFF), den = (uint)(raw[i] >> 32); // razionale: numeratore nei 32 bit bassi
+                    r[i] = den == 0 ? 0 : (double)num / den;
+                }
+                return r;
+            }
+            return null;
+        }
+
         // ---------- conversione ----------
 
         // Converte un file. maxSide > 0 riduce l'immagine (mai ingrandisce) perché il lato lungo non superi maxSide.
-        public static void Convert(string src, string dest, OutputFormat f, int quality, int maxSide)
+        // quarterTurns: rotazione in senso orario a passi di 90° (quella scelta nel visualizzatore).
+        public static void Convert(string src, string dest, OutputFormat f, int quality, int maxSide, int quarterTurns = 0)
         {
             var s = Load(src);
+            quarterTurns = ((quarterTurns % 4) + 4) % 4;
+            if (quarterTurns != 0)
+            {
+                s = Rotate(s, 90 * quarterTurns);
+                s.Freeze();
+            }
             if (maxSide > 0 && Math.Max(s.PixelWidth, s.PixelHeight) > maxSide)
             {
                 using (var g = ToGdi(s))

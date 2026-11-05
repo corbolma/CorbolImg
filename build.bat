@@ -15,9 +15,9 @@ set LANGRES=
 for %%F in (lang\*.txt) do if /i not "%%~nF"=="_template" call set LANGRES=%%LANGRES%% /resource:"%%F",AppImg.lang.%%~nF.txt
 "%CSC%" /nologo /codepage:65001 /target:winexe /optimize+ /out:AppImg.exe ^
   /win32icon:appimg.ico /resource:appimg.ico,AppImg.appimg.ico ^
-  /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Core.dll ^
+  /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Core.dll /r:Microsoft.VisualBasic.dll ^
   /r:"%WPF%\PresentationCore.dll" /r:"%WPF%\WindowsBase.dll" /r:System.Xaml.dll ^
-  AppImg.cs Imaging.cs Version.cs Lang.cs %LANGRES%
+  AppImg.cs Viewer.cs Converter.cs Imaging.cs Version.cs Lang.cs %LANGRES%
 if errorlevel 1 (
   echo Compilazione fallita.
   exit /b 1
