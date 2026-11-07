@@ -36,11 +36,15 @@ namespace AppImg
         readonly ContextMenuStrip listMenu = new ContextMenuStrip();
         readonly ToolStripMenuItem cmOpen = new ToolStripMenuItem(), cmFolder = new ToolStripMenuItem(), cmRemove = new ToolStripMenuItem();
         // Opzioni
-        readonly Label lFormat = new Label(), lQuality = new Label(), lQualityVal = new Label(), lSize = new Label(), lPx = new Label(), lDest = new Label(), lOptions = new Label();
+        readonly Label lFormat = new Label(), lQuality = new Label(), lQualityVal = new Label(), lSize = new Label(), lPx = new Label(), lBy = new Label(), lDest = new Label(), lOptions = new Label();
         readonly ComboBox cbFormat = new ComboBox();
         readonly TrackBar tbQuality = new TrackBar();
-        readonly CheckBox chkResize = new CheckBox(), chkOverwrite = new CheckBox(), chkOpenFolder = new CheckBox();
-        readonly NumericUpDown numMax = new NumericUpDown();
+        readonly ComboBox cbResize = new ComboBox();
+        readonly CheckBox chkOverwrite = new CheckBox(), chkOpenFolder = new CheckBox();
+        readonly NumericUpDown numMax = new NumericUpDown(), numH = new NumericUpDown();
+        ResizeMode resizeMode = ResizeMode.None;
+        int maxSide = 1920, boxW = 1920, boxH = 1080, percent = 50;   // valori ricordati per ogni modalità
+        bool loadingResize;
         readonly RadioButton rbSame = new RadioButton(), rbFolder = new RadioButton();
         readonly TextBox txtFolder = new TextBox();
         readonly Button btnBrowse = new Button(), btnConvert = new Button();
@@ -180,7 +184,7 @@ namespace AppImg
             preview.BorderStyle = BorderStyle.FixedSingle;
             previewInfo.Dock = DockStyle.Bottom;
             previewInfo.AutoSize = false;
-            previewInfo.Height = S(58);
+            previewInfo.Height = S(78);
             previewInfo.TextAlign = ContentAlignment.MiddleLeft;
             previewInfo.ForeColor = Color.DimGray;
             previewInfo.AutoEllipsis = true;
@@ -213,7 +217,7 @@ namespace AppImg
                 l.Anchor = AnchorStyles.Left;
                 l.Margin = new Padding(0, S(4), S(10), S(4));
             }
-            foreach (var l in new[] { lQuality, lQualityVal, lPx })
+            foreach (var l in new[] { lQuality, lQualityVal, lPx, lBy })
             {
                 l.AutoSize = true;
                 l.Margin = new Padding(S(4), S(7), S(4), 0);
@@ -235,15 +239,19 @@ namespace AppImg
             tbQuality.Margin = new Padding(0, S(2), 0, 0);
             tbQuality.ValueChanged += delegate { lQualityVal.Text = tbQuality.Value.ToString(); ScheduleEstimate(); };
 
-            chkResize.AutoSize = true;
-            chkResize.Margin = new Padding(0, S(6), S(4), 0);
-            chkResize.CheckedChanged += delegate { numMax.Enabled = chkResize.Checked; ScheduleEstimate(); };
-            numMax.ValueChanged += delegate { if (chkResize.Checked) ScheduleEstimate(); };
-            numMax.Minimum = 16;
-            numMax.Maximum = 20000;
-            numMax.Increment = 100;
-            numMax.Width = S(80);
-            numMax.Margin = new Padding(0, S(3), 0, S(3));
+            cbResize.DropDownStyle = ComboBoxStyle.DropDownList;
+            cbResize.Width = S(220);
+            cbResize.Margin = new Padding(0, S(3), S(8), S(3));
+            cbResize.SelectedIndexChanged += delegate { if (!loadingResize && cbResize.SelectedIndex >= 0) SetResizeMode((ResizeMode)cbResize.SelectedIndex); };
+            foreach (var n in new[] { numMax, numH })
+            {
+                n.Minimum = 16;
+                n.Maximum = 20000;
+                n.Increment = 100;
+                n.Width = S(80);
+                n.Margin = new Padding(0, S(3), 0, S(3));
+                n.ValueChanged += delegate { ResizeValuesChanged(); };
+            }
 
             foreach (var c in new ButtonBase[] { rbSame, rbFolder, chkOverwrite, chkOpenFolder })
             {
@@ -261,7 +269,7 @@ namespace AppImg
             t.Controls.Add(lFormat, 0, 0);
             t.Controls.Add(Row(cbFormat, lQuality, tbQuality, lQualityVal), 1, 0);
             t.Controls.Add(lSize, 0, 1);
-            t.Controls.Add(Row(chkResize, numMax, lPx), 1, 1);
+            t.Controls.Add(Row(cbResize, numMax, lBy, numH, lPx), 1, 1);
             t.Controls.Add(lDest, 0, 2);
             t.Controls.Add(Row(rbSame, rbFolder, txtFolder, btnBrowse), 1, 2);
             t.Controls.Add(lOptions, 0, 3);
@@ -335,8 +343,16 @@ namespace AppImg
             lFormat.Text = L.T("Converti in:", "Convert to:");
             lQuality.Text = L.T("Qualità:", "Quality:");
             lSize.Text = L.T("Dimensioni:", "Size:");
-            chkResize.Text = L.T("Riduci se il lato lungo supera", "Shrink if the long side exceeds");
-            lPx.Text = "px";
+            loadingResize = true;
+            cbResize.Items.Clear();
+            cbResize.Items.Add(L.T("Dimensioni originali", "Original size"));
+            cbResize.Items.Add(L.T("Riduci il lato lungo a", "Shrink the long side to"));
+            cbResize.Items.Add(L.T("Riduci per stare in", "Shrink to fit within"));
+            cbResize.Items.Add(L.T("Riduci in percentuale al", "Shrink by percentage to"));
+            cbResize.SelectedIndex = (int)resizeMode;
+            loadingResize = false;
+            lBy.Text = "×";
+            lPx.Text = resizeMode == ResizeMode.Percent ? "%" : "px";
             lDest.Text = L.T("Salva in:", "Save to:");
             rbSame.Text = L.T("Stessa cartella dell'originale", "Same folder as the original");
             rbFolder.Text = L.T("Cartella:", "Folder:");
@@ -346,7 +362,10 @@ namespace AppImg
             chkOpenFolder.Text = L.T("Apri la cartella al termine", "Open the folder when done");
             tips.SetToolTip(chkOverwrite, L.T("Se non è selezionata, i nuovi file vengono rinominati, es. foto (1).png. L'originale non viene mai sovrascritto.",
                                               "If unchecked, new files are renamed, e.g. photo (1).png. The original is never overwritten."));
-            tips.SetToolTip(chkResize, L.T("Le immagini più piccole non vengono ingrandite.", "Smaller images are never enlarged."));
+            tips.SetToolTip(cbResize, L.T("Le proporzioni restano quelle dell'originale e le immagini più piccole non vengono ingrandite.",
+                                          "The original proportions are kept and smaller images are never enlarged."));
+            tips.SetToolTip(numMax, resizeMode == ResizeMode.Box ? L.T("Larghezza massima", "Maximum width") : null);
+            tips.SetToolTip(numH, L.T("Altezza massima", "Maximum height"));
             btnConvert.Text = converting ? L.T("Annulla", "Cancel") : L.T("Converti", "Convert");
             if (!converting) UpdateStatusIdle();
             UpdateQualityState();
@@ -366,9 +385,13 @@ namespace AppImg
             cbFormat.SelectedIndex = idx >= 0 ? idx : 0;
             tbQuality.Value = Math.Max(1, Math.Min(100, Settings.Get("quality", 90)));
             lQualityVal.Text = tbQuality.Value.ToString();
-            chkResize.Checked = Settings.Get("resize", false);
-            numMax.Value = Math.Max(numMax.Minimum, Math.Min(numMax.Maximum, Settings.Get("maxSide", 1920)));
-            numMax.Enabled = chkResize.Checked;
+            // "resize" era la casella della versione 1.0 (solo lato lungo)
+            string mode = Settings.Get("resizeMode", Settings.Get("resize", false) ? "long" : "none");
+            maxSide = Clamp(Settings.Get("maxSide", 1920), 16, 20000);
+            boxW = Clamp(Settings.Get("maxWidth", 1920), 16, 20000);
+            boxH = Clamp(Settings.Get("maxHeight", 1080), 16, 20000);
+            percent = Clamp(Settings.Get("percent", 50), 1, 99);
+            SetResizeMode(mode == "long" ? ResizeMode.LongSide : mode == "box" ? ResizeMode.Box : mode == "percent" ? ResizeMode.Percent : ResizeMode.None);
             string dir = Settings.Get("outDir", "");
             txtFolder.Text = dir.Length > 0 ? dir : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "AppImg");
             rbFolder.Checked = Settings.Get("useOutDir", false);
@@ -383,8 +406,12 @@ namespace AppImg
             var f = SelectedFormat;
             if (f != null) Settings.Set("format", f.Id);
             Settings.Set("quality", tbQuality.Value);
-            Settings.Set("resize", chkResize.Checked);
-            Settings.Set("maxSide", (int)numMax.Value);
+            Settings.Set("resizeMode", resizeMode == ResizeMode.LongSide ? "long" : resizeMode == ResizeMode.Box ? "box" : resizeMode == ResizeMode.Percent ? "percent" : "none");
+            Settings.Set("resize", resizeMode != ResizeMode.None);
+            Settings.Set("maxSide", maxSide);
+            Settings.Set("maxWidth", boxW);
+            Settings.Set("maxHeight", boxH);
+            Settings.Set("percent", percent);
             Settings.Set("useOutDir", rbFolder.Checked);
             Settings.Set("outDir", txtFolder.Text.Trim());
             Settings.Set("overwrite", chkOverwrite.Checked);
@@ -394,6 +421,56 @@ namespace AppImg
             Settings.Set("convWidth", (int)(b.Width / scale));
             Settings.Set("convHeight", (int)(b.Height / scale));
             Settings.Save();
+        }
+
+        static int Clamp(int v, int min, int max) { return Math.Max(min, Math.Min(max, v)); }
+
+        // Riduzione scelta: i campi numerici mostrano i valori della modalità attiva.
+        void SetResizeMode(ResizeMode m)
+        {
+            loadingResize = true;
+            resizeMode = m;
+            if (cbResize.Items.Count > (int)m && cbResize.SelectedIndex != (int)m) cbResize.SelectedIndex = (int)m;
+            bool pct = m == ResizeMode.Percent;
+            // Prima si allargano i limiti, poi si mette il valore, infine si stringono
+            numMax.Minimum = 1;
+            numMax.Maximum = 20000;
+            numMax.Value = Clamp(m == ResizeMode.Box ? boxW : pct ? percent : maxSide, pct ? 1 : 16, pct ? 99 : 20000);
+            numMax.Minimum = pct ? 1 : 16;
+            numMax.Maximum = pct ? 99 : 20000;
+            numMax.Increment = pct ? 5 : 100;
+            numH.Value = Clamp(boxH, 16, 20000);
+            numMax.Visible = lPx.Visible = m != ResizeMode.None;
+            numH.Visible = lBy.Visible = m == ResizeMode.Box;
+            lPx.Text = pct ? "%" : "px";
+            tips.SetToolTip(numMax, m == ResizeMode.Box ? L.T("Larghezza massima", "Maximum width") : null);
+            loadingResize = false;
+            ScheduleEstimate();
+        }
+
+        void ResizeValuesChanged()
+        {
+            if (loadingResize) return;
+            int v = (int)numMax.Value;
+            if (resizeMode == ResizeMode.LongSide) maxSide = v;
+            else if (resizeMode == ResizeMode.Box) { boxW = v; boxH = (int)numH.Value; }
+            else if (resizeMode == ResizeMode.Percent) percent = v;
+            else return;
+            ScheduleEstimate();
+        }
+
+        ResizeSpec CurrentResize
+        {
+            get
+            {
+                switch (resizeMode)
+                {
+                    case ResizeMode.LongSide: return new ResizeSpec { Mode = ResizeMode.LongSide, A = maxSide };
+                    case ResizeMode.Box: return new ResizeSpec { Mode = ResizeMode.Box, A = boxW, B = boxH };
+                    case ResizeMode.Percent: return new ResizeSpec { Mode = ResizeMode.Percent, A = percent };
+                    default: return new ResizeSpec();
+                }
+            }
         }
 
         void UpdateQualityState()
@@ -693,6 +770,8 @@ namespace AppImg
             {
                 s += "\n" + it.Info.Format + "  ·  " + it.Info.Width + " × " + it.Info.Height + " px  ·  " + it.Row.SubItems[3].Text;
                 if (it.Info.Frames > 1) s += "  ·  " + L.F("{0} fotogrammi/pagine (si converte il primo)", "{0} frames/pages (the first is converted)", it.Info.Frames);
+                var to = CurrentResize.Target(it.Info.Width, it.Info.Height);
+                if (to != null) s += "\n" + L.F("Ridotta a {0} × {1} px", "Shrunk to {0} × {1} px", to.Value.Width, to.Value.Height);
                 var f = SelectedFormat;
                 if (it.Estimate >= 0 && f != null)
                     s += "\n" + L.F("Dopo la conversione in {0}: ≈ {1}", "After converting to {0}: ≈ {1}", f.Name, Util.FormatBytes(it.Estimate)) + Change(it.Bytes, it.Estimate);
@@ -735,7 +814,8 @@ namespace AppImg
         {
             var f = SelectedFormat;
             if (f == null || converting) return;
-            int gen = estGen, quality = tbQuality.Value, maxSide = chkResize.Checked ? (int)numMax.Value : 0;
+            int gen = estGen, quality = tbQuality.Value;
+            var resize = CurrentResize;
             var sel = SelectedItem;
             var todo = items.Where(i => !i.Unsupported).OrderBy(i => i == sel ? 0 : 1).ToList();
             Program.RunSta(delegate
@@ -746,13 +826,13 @@ namespace AppImg
                     long size;
                     try
                     {
-                        string key = it.Path + "|" + maxSide;
+                        string key = it.Path + "|" + resize.Key;
                         System.Windows.Media.Imaging.BitmapSource src;
                         lock (prepared)
                             prepared.TryGetValue(key, out src);
                         if (src == null)
                         {
-                            src = Imaging.Prepare(it.Path, maxSide);
+                            src = Imaging.Prepare(it.Path, resize);
                             lock (prepared)
                             {
                                 prepared[key] = src;
@@ -814,11 +894,10 @@ namespace AppImg
         void SetBusy(bool busy)
         {
             converting = busy;
-            foreach (Control c in new Control[] { cbFormat, tbQuality, chkResize, numMax, rbSame, rbFolder, txtFolder, btnBrowse, chkOverwrite, chkOpenFolder })
+            foreach (Control c in new Control[] { cbFormat, tbQuality, cbResize, numMax, numH, rbSame, rbFolder, txtFolder, btnBrowse, chkOverwrite, chkOpenFolder })
                 c.Enabled = !busy;
             if (!busy)
             {
-                numMax.Enabled = chkResize.Checked;
                 txtFolder.Enabled = btnBrowse.Enabled = rbFolder.Checked;
                 UpdateQualityState();
             }
@@ -852,7 +931,8 @@ namespace AppImg
             }
             SaveOptions();
             estGen++; // la stima si ferma durante la conversione
-            int quality = tbQuality.Value, maxSide = chkResize.Checked ? (int)numMax.Value : 0;
+            int quality = tbQuality.Value;
+            var resize = CurrentResize;
             bool overwrite = chkOverwrite.Checked, openFolder = chkOpenFolder.Checked;
 
             cancel = false;
@@ -878,7 +958,7 @@ namespace AppImg
                     {
                         dest = DestPath(it.Path, outDir, f.Ext, overwrite, produced);
                         produced.Add(dest);
-                        Imaging.Convert(it.Path, dest, f, quality, maxSide);
+                        Imaging.Convert(it.Path, dest, f, quality, resize);
                         long len = new FileInfo(dest).Length;
                         state = "✓ " + Path.GetFileName(dest) + "  (" + Util.FormatBytes(len) + ")";
                         good = true;

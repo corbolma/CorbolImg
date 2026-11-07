@@ -389,11 +389,21 @@ namespace AppImg
         // quarterTurns: rotazione in senso orario a passi di 90° (quella scelta nel visualizzatore).
         public static void Convert(string src, string dest, OutputFormat f, int quality, int maxSide, int quarterTurns = 0)
         {
-            Save(Prepare(src, maxSide, quarterTurns), dest, f, quality);
+            Convert(src, dest, f, quality, ResizeSpec.LongSide(maxSide), quarterTurns);
+        }
+
+        public static void Convert(string src, string dest, OutputFormat f, int quality, ResizeSpec resize, int quarterTurns = 0)
+        {
+            Save(Prepare(src, resize, quarterTurns), dest, f, quality);
+        }
+
+        public static BitmapSource Prepare(string src, int maxSide, int quarterTurns = 0)
+        {
+            return Prepare(src, ResizeSpec.LongSide(maxSide), quarterTurns);
         }
 
         // Immagine pronta da salvare: letta, ruotata e ridotta come richiesto.
-        public static BitmapSource Prepare(string src, int maxSide, int quarterTurns = 0)
+        public static BitmapSource Prepare(string src, ResizeSpec resize, int quarterTurns = 0)
         {
             var s = Load(src);
             quarterTurns = ((quarterTurns % 4) + 4) % 4;
@@ -402,10 +412,11 @@ namespace AppImg
                 s = Rotate(s, 90 * quarterTurns);
                 s.Freeze();
             }
-            if (maxSide > 0 && Math.Max(s.PixelWidth, s.PixelHeight) > maxSide)
+            var size = resize == null ? null : resize.Target(s.PixelWidth, s.PixelHeight);
+            if (size != null)
             {
                 using (var g = ToGdi(s))
-                using (var r = Scale(g, Fit(s.PixelWidth, s.PixelHeight, maxSide)))
+                using (var r = Scale(g, size.Value))
                     s = FromGdi(r, s.DpiX, s.DpiY);
             }
             return s;
@@ -715,6 +726,36 @@ namespace AppImg
             foreach (var o in offsets) sb.Append(o.ToString("0000000000", ci) + " 00000 n \n");
             sb.Append("trailer\n<< /Size " + (offsets.Count + 1) + " /Root 1 0 R /Info 6 0 R >>\nstartxref\n" + xref + "\n%%EOF\n");
             put(sb.ToString());
+        }
+    }
+    // Come ridurre le immagini nel convertitore. Non ingrandisce mai: se l'immagine è già abbastanza piccola resta com'è.
+    enum ResizeMode { None, LongSide, Box, Percent }
+
+    class ResizeSpec
+    {
+        public ResizeMode Mode;
+        public int A, B;   // LongSide: A = lato lungo massimo; Box: A × B massimi; Percent: A = percentuale (1-99)
+
+        public static ResizeSpec LongSide(int maxSide) { return new ResizeSpec { Mode = maxSide > 0 ? ResizeMode.LongSide : ResizeMode.None, A = maxSide }; }
+
+        // Chiave per la cache delle immagini già preparate
+        public string Key { get { return Mode == ResizeMode.None ? "none" : Mode + ":" + A + "x" + B; } }
+
+        // Nuove dimensioni, oppure null se l'immagine non va toccata.
+        public System.Drawing.Size? Target(int w, int h)
+        {
+            double k;
+            switch (Mode)
+            {
+                case ResizeMode.LongSide: k = A > 0 ? (double)A / Math.Max(w, h) : 1; break;
+                case ResizeMode.Box: k = A > 0 && B > 0 ? Math.Min((double)A / w, (double)B / h) : 1; break;
+                case ResizeMode.Percent: k = A > 0 ? A / 100.0 : 1; break;
+                default: return null;
+            }
+            if (k >= 1) return null;
+            var r = new System.Drawing.Size(Math.Max(1, (int)Math.Round(w * k)), Math.Max(1, (int)Math.Round(h * k)));
+            if (r.Width == w && r.Height == h) return null;
+            return r;
         }
     }
 }
