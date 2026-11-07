@@ -36,7 +36,7 @@
 - La trasparenza resta nei formati che la supportano; negli altri diventa bianca. L'originale non viene mai sovrascritto: se il file esiste viene creato `foto (1).png`, salvo scelta diversa.
 - Da Esplora file: seleziona le immagini → tasto destro → **Invia a → AppImg** apre direttamente il convertitore.
 
-<p align="center"><img src="docs/convertitore.png" alt="AppImg: sei immagini convertite in JPEG" width="620"></p>
+<p align="center"><img src="docs/convertitore.png" alt="AppImg: sei immagini da convertire in JPEG, ridotte e con il peso previsto" width="620"></p>
 
 ### Formati letti
 AppImg usa i codec di Windows: legge BMP, PNG, JPEG, GIF, TIFF, ICO, JPEG XR e, con le estensioni gratuite del Microsoft Store, anche **HEIC/HEIF** (foto di iPhone), **WebP**, **AVIF**, **JPEG XL** e i **RAW** delle fotocamere (CR2, CR3, NEF, ARW, DNG, ORF, RW2...). Se un'immagine non si apre, installa l'estensione corrispondente: *Estensioni immagine HEIF* (con *Estensioni video HEVC*), *Estensioni immagine WebP*, *Estensione video AV1*, *Raw Image Extension*.
