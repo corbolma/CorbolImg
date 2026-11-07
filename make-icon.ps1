@@ -26,62 +26,34 @@ function New-IconBitmap([int]$s) {
     $rect = New-Object System.Drawing.RectangleF $m, $m, $w, $w
     $bg = New-RoundRect $m $m $w $w ($s * 0.22)
 
-    # Sfondo: gradiente diagonale viola -> rosa
+    # Sfondo: gradiente grigio ardesia (scuro in basso)
     $grad = New-Object System.Drawing.Drawing2D.LinearGradientBrush $rect,
-        ([System.Drawing.Color]::FromArgb(255, 109, 40, 217)),
-        ([System.Drawing.Color]::FromArgb(255, 236, 72, 153)), 45.0
+        ([System.Drawing.Color]::FromArgb(255, 30, 41, 59)),
+        ([System.Drawing.Color]::FromArgb(255, 51, 65, 85)), 45.0
     $g.FillPath($grad, $bg)
 
     # Riflesso morbido in alto
     $hl = New-Object System.Drawing.Drawing2D.LinearGradientBrush $rect,
-        ([System.Drawing.Color]::FromArgb(70, 255, 255, 255)),
+        ([System.Drawing.Color]::FromArgb(60, 255, 255, 255)),
         ([System.Drawing.Color]::FromArgb(0, 255, 255, 255)), 90.0
     $g.FillPath($hl, $bg)
 
-    # "Foto": riquadro bianco con montagne e sole
-    $px = $s * 0.20; $py = $s * 0.24; $pw = $s * 0.60; $ph = $s * 0.50
-    if ($s -lt 24) { $px = $s * 0.14; $py = $s * 0.2; $pw = $s * 0.72; $ph = $s * 0.6 }
-    $photo = New-RoundRect $px $py $pw $ph ([Math]::Max(1.0, $s * 0.06))
-    $g.FillPath([System.Drawing.Brushes]::White, $photo)
-    $g.SetClip($photo)
-    $sky = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, 124, 58, 237))
-    $sun = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, 251, 191, 36))
-    $hill = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, 236, 72, 153))
-    $sr = $ph * 0.14
-    $g.FillEllipse($sun, $px + $pw * 0.70 - $sr, $py + $ph * 0.28 - $sr, 2 * $sr, 2 * $sr)
-    $back = @(
-        (New-Object System.Drawing.PointF ($px - 1), ($py + $ph + 1)),
-        (New-Object System.Drawing.PointF ($px + $pw * 0.30), ($py + $ph * 0.38)),
-        (New-Object System.Drawing.PointF ($px + $pw * 0.62), ($py + $ph + 1)))
-    $g.FillPolygon($sky, $back)
-    $front = @(
-        (New-Object System.Drawing.PointF ($px + $pw * 0.35), ($py + $ph + 1)),
-        (New-Object System.Drawing.PointF ($px + $pw * 0.68), ($py + $ph * 0.55)),
-        (New-Object System.Drawing.PointF ($px + $pw + 1), ($py + $ph + 1)))
-    $g.FillPolygon($hill, $front)
-    $g.ResetClip()
-
-    # Due frecce circolari (conversione) in basso a destra, dalle dimensioni medie in su
-    if ($s -ge 32) {
-        $cx = $s * 0.76; $cy = $s * 0.76; $r = $s * 0.17
-        $ring = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::White)
-        $g.FillEllipse($ring, $cx - $r, $cy - $r, 2 * $r, 2 * $r)
-        $pen = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(255, 109, 40, 217)), ([Math]::Max(1.5, $s * 0.035))
-        $ar = $r * 0.55
-        $g.DrawArc($pen, $cx - $ar, $cy - $ar, 2 * $ar, 2 * $ar, 200, 130)
-        $g.DrawArc($pen, $cx - $ar, $cy - $ar, 2 * $ar, 2 * $ar, 20, 130)
-        $hb = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, 109, 40, 217))
-        $hs = $r * 0.32
-        foreach ($a in 330, 150) {
-            $rad = $a * [Math]::PI / 180
-            $ex = $cx + $ar * [Math]::Cos($rad); $ey = $cy + $ar * [Math]::Sin($rad)
-            $t = $rad + [Math]::PI / 2   # direzione tangente (senso orario)
-            $tip = New-Object System.Drawing.PointF ($ex + $hs * [Math]::Cos($t)), ($ey + $hs * [Math]::Sin($t))
-            $l = New-Object System.Drawing.PointF ($ex + $hs * 0.8 * [Math]::Cos($rad)), ($ey + $hs * 0.8 * [Math]::Sin($rad))
-            $rr = New-Object System.Drawing.PointF ($ex - $hs * 0.8 * [Math]::Cos($rad)), ($ey - $hs * 0.8 * [Math]::Sin($rad))
-            $g.FillPolygon($hb, @($tip, $l, $rr))
-        }
+    # Mirino: quattro angoli di messa a fuoco bianchi
+    $pen = New-Object System.Drawing.Pen ([System.Drawing.Color]::White), ([Math]::Max(1.5, $s * 0.075))
+    $pen.StartCap = 'Round'; $pen.EndCap = 'Round'; $pen.LineJoin = 'Round'
+    $a = $s * 0.24; $b = $s * 0.76; $len = $s * 0.16
+    foreach ($c in @(@($a, $a, 1, 1), @($b, $a, -1, 1), @($a, $b, 1, -1), @($b, $b, -1, -1))) {
+        $x = $c[0]; $y = $c[1]
+        $g.DrawLines($pen, [System.Drawing.PointF[]]@(
+            (New-Object System.Drawing.PointF ([float]($x + $c[2] * $len)), ([float]$y)),
+            (New-Object System.Drawing.PointF ([float]$x), ([float]$y)),
+            (New-Object System.Drawing.PointF ([float]$x), ([float]($y + $c[3] * $len)))))
     }
+
+    # Punto di fuoco ambra al centro
+    $dot = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, 251, 191, 36))
+    $dr = $s * 0.11
+    $g.FillEllipse($dot, $s / 2 - $dr, $s / 2 - $dr, 2 * $dr, 2 * $dr)
 
     $g.Dispose()
     return $bmp
