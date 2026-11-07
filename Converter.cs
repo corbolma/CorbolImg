@@ -44,7 +44,8 @@ namespace AppImg
         readonly NumericUpDown numMax = new NumericUpDown(), numH = new NumericUpDown();
         ResizeMode resizeMode = ResizeMode.None;
         int maxSide = 1920, boxW = 1920, boxH = 1080, percent = 50;   // valori ricordati per ogni modalità
-        bool loadingResize;
+        bool loadingResize, keepRatio = true;
+        readonly CheckBox chkRatio = new CheckBox();
         readonly RadioButton rbSame = new RadioButton(), rbFolder = new RadioButton();
         readonly TextBox txtFolder = new TextBox();
         readonly Button btnBrowse = new Button(), btnConvert = new Button();
@@ -250,8 +251,17 @@ namespace AppImg
                 n.Increment = 100;
                 n.Width = S(80);
                 n.Margin = new Padding(0, S(3), 0, S(3));
-                n.ValueChanged += delegate { ResizeValuesChanged(); };
+                n.ValueChanged += (s, e) => ResizeValuesChanged(s);
             }
+            chkRatio.AutoSize = true;
+            chkRatio.Margin = new Padding(S(14), S(6), 0, 0);
+            chkRatio.CheckedChanged += delegate
+            {
+                if (loadingResize) return;
+                keepRatio = chkRatio.Checked;
+                if (keepRatio) LinkBox(false);
+                ScheduleEstimate();
+            };
 
             foreach (var c in new ButtonBase[] { rbSame, rbFolder, chkOverwrite, chkOpenFolder })
             {
@@ -269,7 +279,7 @@ namespace AppImg
             t.Controls.Add(lFormat, 0, 0);
             t.Controls.Add(Row(cbFormat, lQuality, tbQuality, lQualityVal), 1, 0);
             t.Controls.Add(lSize, 0, 1);
-            t.Controls.Add(Row(cbResize, numMax, lBy, numH, lPx), 1, 1);
+            t.Controls.Add(Row(cbResize, numMax, lBy, numH, lPx, chkRatio), 1, 1);
             t.Controls.Add(lDest, 0, 2);
             t.Controls.Add(Row(rbSame, rbFolder, txtFolder, btnBrowse), 1, 2);
             t.Controls.Add(lOptions, 0, 3);
@@ -362,8 +372,10 @@ namespace AppImg
             chkOpenFolder.Text = L.T("Apri la cartella al termine", "Open the folder when done");
             tips.SetToolTip(chkOverwrite, L.T("Se non è selezionata, i nuovi file vengono rinominati, es. foto (1).png. L'originale non viene mai sovrascritto.",
                                               "If unchecked, new files are renamed, e.g. photo (1).png. The original is never overwritten."));
-            tips.SetToolTip(cbResize, L.T("Le proporzioni restano quelle dell'originale e le immagini più piccole non vengono ingrandite.",
-                                          "The original proportions are kept and smaller images are never enlarged."));
+            tips.SetToolTip(cbResize, L.T("Le immagini più piccole non vengono ingrandite.", "Smaller images are never enlarged."));
+            chkRatio.Text = L.T("Mantieni proporzioni", "Keep aspect ratio");
+            tips.SetToolTip(chkRatio, L.T("Selezionata: cambiando un lato cambia anche l'altro e ogni immagine entra nel riquadro senza deformarsi.\nNon selezionata: i due lati vengono portati esattamente a larghezza e altezza, anche deformando l'immagine (mai ingrandendola).",
+                                          "Checked: changing one side also changes the other, and each image fits in the box without distortion.\nUnchecked: the two sides are resized to exactly width and height, even if this distorts the image (never enlarging it)."));
             tips.SetToolTip(numMax, resizeMode == ResizeMode.Box ? L.T("Larghezza massima", "Maximum width") : null);
             tips.SetToolTip(numH, L.T("Altezza massima", "Maximum height"));
             btnConvert.Text = converting ? L.T("Annulla", "Cancel") : L.T("Converti", "Convert");
@@ -391,6 +403,10 @@ namespace AppImg
             boxW = Clamp(Settings.Get("maxWidth", 1920), 16, 20000);
             boxH = Clamp(Settings.Get("maxHeight", 1080), 16, 20000);
             percent = Clamp(Settings.Get("percent", 50), 1, 99);
+            keepRatio = Settings.Get("keepRatio", true);
+            loadingResize = true;
+            chkRatio.Checked = keepRatio;
+            loadingResize = false;
             SetResizeMode(mode == "long" ? ResizeMode.LongSide : mode == "box" ? ResizeMode.Box : mode == "percent" ? ResizeMode.Percent : ResizeMode.None);
             string dir = Settings.Get("outDir", "");
             txtFolder.Text = dir.Length > 0 ? dir : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "AppImg");
@@ -411,6 +427,7 @@ namespace AppImg
             Settings.Set("maxSide", maxSide);
             Settings.Set("maxWidth", boxW);
             Settings.Set("maxHeight", boxH);
+            Settings.Set("keepRatio", keepRatio);
             Settings.Set("percent", percent);
             Settings.Set("useOutDir", rbFolder.Checked);
             Settings.Set("outDir", txtFolder.Text.Trim());
@@ -441,22 +458,47 @@ namespace AppImg
             numMax.Increment = pct ? 5 : 100;
             numH.Value = Clamp(boxH, 16, 20000);
             numMax.Visible = lPx.Visible = m != ResizeMode.None;
-            numH.Visible = lBy.Visible = m == ResizeMode.Box;
+            numH.Visible = lBy.Visible = chkRatio.Visible = m == ResizeMode.Box;
             lPx.Text = pct ? "%" : "px";
             tips.SetToolTip(numMax, m == ResizeMode.Box ? L.T("Larghezza massima", "Maximum width") : null);
             loadingResize = false;
             ScheduleEstimate();
         }
 
-        void ResizeValuesChanged()
+        void ResizeValuesChanged(object sender)
         {
             if (loadingResize) return;
             int v = (int)numMax.Value;
             if (resizeMode == ResizeMode.LongSide) maxSide = v;
-            else if (resizeMode == ResizeMode.Box) { boxW = v; boxH = (int)numH.Value; }
+            else if (resizeMode == ResizeMode.Box)
+            {
+                boxW = v; boxH = (int)numH.Value;
+                // Proporzioni bloccate: cambiando un lato cambia anche l'altro
+                if (keepRatio) LinkBox(sender == numH);
+            }
             else if (resizeMode == ResizeMode.Percent) percent = v;
             else return;
             ScheduleEstimate();
+        }
+
+        // Rapporto larghezza/altezza a cui legare i due campi: quello dell'immagine selezionata,
+        // altrimenti della prima in elenco, altrimenti quello attuale del riquadro.
+        double RefRatio()
+        {
+            var it = SelectedItem;
+            if (it == null || it.Info == null) it = items.FirstOrDefault(i => i.Info != null && i.Info.Width > 0 && i.Info.Height > 0);
+            if (it != null && it.Info != null && it.Info.Width > 0 && it.Info.Height > 0) return (double)it.Info.Width / it.Info.Height;
+            return boxH > 0 ? (double)boxW / boxH : 16.0 / 9;
+        }
+
+        // Ricalcola l'altro lato del riquadro con il rapporto di riferimento.
+        void LinkBox(bool fromHeight)
+        {
+            double r = RefRatio();
+            loadingResize = true;
+            if (fromHeight) { boxW = Clamp((int)Math.Round(boxH * r), 16, 20000); numMax.Value = boxW; }
+            else { boxH = Clamp((int)Math.Round(boxW / r), 16, 20000); numH.Value = boxH; }
+            loadingResize = false;
         }
 
         ResizeSpec CurrentResize
@@ -466,7 +508,7 @@ namespace AppImg
                 switch (resizeMode)
                 {
                     case ResizeMode.LongSide: return new ResizeSpec { Mode = ResizeMode.LongSide, A = maxSide };
-                    case ResizeMode.Box: return new ResizeSpec { Mode = ResizeMode.Box, A = boxW, B = boxH };
+                    case ResizeMode.Box: return new ResizeSpec { Mode = ResizeMode.Box, A = boxW, B = boxH, Stretch = !keepRatio };
                     case ResizeMode.Percent: return new ResizeSpec { Mode = ResizeMode.Percent, A = percent };
                     default: return new ResizeSpec();
                 }
@@ -894,7 +936,7 @@ namespace AppImg
         void SetBusy(bool busy)
         {
             converting = busy;
-            foreach (Control c in new Control[] { cbFormat, tbQuality, cbResize, numMax, numH, rbSame, rbFolder, txtFolder, btnBrowse, chkOverwrite, chkOpenFolder })
+            foreach (Control c in new Control[] { cbFormat, tbQuality, cbResize, numMax, numH, chkRatio, rbSame, rbFolder, txtFolder, btnBrowse, chkOverwrite, chkOpenFolder })
                 c.Enabled = !busy;
             if (!busy)
             {

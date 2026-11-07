@@ -735,15 +735,23 @@ namespace AppImg
     {
         public ResizeMode Mode;
         public int A, B;   // LongSide: A = lato lungo massimo; Box: A × B massimi; Percent: A = percentuale (1-99)
+        public bool Stretch;   // Box senza proporzioni: ogni lato viene portato a A e B (senza ingrandire), anche deformando
 
         public static ResizeSpec LongSide(int maxSide) { return new ResizeSpec { Mode = maxSide > 0 ? ResizeMode.LongSide : ResizeMode.None, A = maxSide }; }
 
         // Chiave per la cache delle immagini già preparate
-        public string Key { get { return Mode == ResizeMode.None ? "none" : Mode + ":" + A + "x" + B; } }
+        public string Key { get { return Mode == ResizeMode.None ? "none" : Mode + ":" + A + "x" + B + (Stretch ? "s" : ""); } }
 
         // Nuove dimensioni, oppure null se l'immagine non va toccata.
         public System.Drawing.Size? Target(int w, int h)
         {
+            if (Mode == ResizeMode.Box && Stretch)
+            {
+                if (A <= 0 || B <= 0) return null;
+                var d = new System.Drawing.Size(Math.Min(w, A), Math.Min(h, B));
+                if (d.Width == w && d.Height == h) return null;
+                return d;
+            }
             double k;
             switch (Mode)
             {
