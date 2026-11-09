@@ -1,6 +1,6 @@
 # Statistiche AppImg
 
-Aggiornato il 2026-11-08 (UTC) dalla GitHub Action *Statistiche download*.
+Aggiornato il 2026-11-09 (UTC) dalla GitHub Action *Statistiche download*.
 
 ## Download totali per file
 
@@ -14,6 +14,7 @@ Aggiornato il 2026-11-08 (UTC) dalla GitHub Action *Statistiche download*.
 
 | Giorno | Nuovi | Totale |
 |---|---:|---:|
+| 2026-11-09 | 0 | 4 |
 | 2026-11-08 | 2 | 4 |
 | 2026-11-07 | 2 | 2 |
 
@@ -21,6 +22,7 @@ Aggiornato il 2026-11-08 (UTC) dalla GitHub Action *Statistiche download*.
 
 | Giorno | Visite | Visitatori unici | Clone | Clone unici |
 |---|---:|---:|---:|---:|
+| 2026-11-08 | 0 | 0 | 6 | 6 |
 | 2026-11-07 | 0 | 0 | 32 | 18 |
 
 Dati completi: [downloads.csv](downloads.csv) · [traffic.csv](traffic.csv)
