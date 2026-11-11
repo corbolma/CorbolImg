@@ -3,8 +3,8 @@ using System.Reflection;
 
 [assembly: AssemblyProduct("AppImg")]
 [assembly: AssemblyCopyright(AppImg.AppVersion.Copyright)]
-[assembly: AssemblyVersion("1.1.0.0")]
-[assembly: AssemblyFileVersion("1.1.0.0")]
+[assembly: AssemblyVersion("1.2.0.0")]
+[assembly: AssemblyFileVersion("1.2.0.0")]
 
 namespace AppImg
 {
@@ -14,6 +14,6 @@ namespace AppImg
         public const string Author = "Mauro Corboli";
         public const string Copyright = "Copyright © 2026 " + Author + " - MIT License";
         public const string RepoUrl = "https://github.com/corbolma/AppImg";
-        public const string Text = "1.1.0";
+        public const string Text = "1.2.0";
     }
 }
