@@ -598,7 +598,7 @@ namespace AppImg
             return new Gdi.Size(Math.Max(1, (int)Math.Round(w * k)), Math.Max(1, (int)Math.Round(h * k)));
         }
 
-        static Gdi.Bitmap ToGdi(BitmapSource s)
+        public static Gdi.Bitmap ToGdi(BitmapSource s)
         {
             var b = ToBgra(s);
             int w = b.PixelWidth, h = b.PixelHeight;
@@ -609,7 +609,7 @@ namespace AppImg
             return bmp;
         }
 
-        static BitmapSource FromGdi(Gdi.Bitmap bmp, double dpiX, double dpiY)
+        public static BitmapSource FromGdi(Gdi.Bitmap bmp, double dpiX, double dpiY)
         {
             int w = bmp.Width, h = bmp.Height;
             var data = bmp.LockBits(new Gdi.Rectangle(0, 0, w, h), GdiImaging.ImageLockMode.ReadOnly, GdiImaging.PixelFormat.Format32bppArgb);
@@ -622,7 +622,7 @@ namespace AppImg
             finally { bmp.UnlockBits(data); }
         }
 
-        static Gdi.Bitmap Scale(Gdi.Image src, Gdi.Size size)
+        public static Gdi.Bitmap Scale(Gdi.Image src, Gdi.Size size)
         {
             var dst = new Gdi.Bitmap(size.Width, size.Height, GdiImaging.PixelFormat.Format32bppArgb);
             Draw(src, dst, new Gdi.Rectangle(0, 0, size.Width, size.Height));

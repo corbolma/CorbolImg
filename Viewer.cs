@@ -20,7 +20,8 @@ namespace AppImg
     {
         public const char Open = '', Prev = '', Next = '', ZoomOut = '', ZoomIn = '',
             Fit = '', Rotate = '', Delete = '', Info = '', FullScreen = '',
-            SaveAs = '', Convert = '', More = '', Copy = '', Folder = '', Slideshow = '';
+            SaveAs = '', Convert = '', More = '', Copy = '', Folder = '', Slideshow = '',
+            Grid = '';
 
         static string font;
         static string Font
@@ -480,7 +481,7 @@ namespace AppImg
         readonly ToolStripButton bOpen = new ToolStripButton(), bPrev = new ToolStripButton(), bNext = new ToolStripButton(),
             bZoomOut = new ToolStripButton(), bFit = new ToolStripButton(), b100 = new ToolStripButton(), bZoomIn = new ToolStripButton(),
             bRotL = new ToolStripButton(), bRotR = new ToolStripButton(), bDelete = new ToolStripButton(),
-            bSaveAs = new ToolStripButton(), bInfo = new ToolStripButton(), bFull = new ToolStripButton();
+            bSaveAs = new ToolStripButton(), bInfo = new ToolStripButton(), bFull = new ToolStripButton(), bGrid = new ToolStripButton();
         readonly ToolStripSplitButton bConvert = new ToolStripSplitButton();
         readonly ToolStripDropDownButton bMore = new ToolStripDropDownButton();
         readonly ToolStripMenuItem cvThis = new ToolStripMenuItem(), cvFolder = new ToolStripMenuItem(), cvOpen = new ToolStripMenuItem();
@@ -492,7 +493,7 @@ namespace AppImg
         readonly ContextMenuStrip ctx = new ContextMenuStrip();
         readonly ToolStripMenuItem cSave = new ToolStripMenuItem(), cConvert = new ToolStripMenuItem(), cCopy = new ToolStripMenuItem(),
             cFolder = new ToolStripMenuItem(), cRotL = new ToolStripMenuItem(), cRotR = new ToolStripMenuItem(), cDelete = new ToolStripMenuItem(),
-            cInfo = new ToolStripMenuItem(), cFull = new ToolStripMenuItem();
+            cInfo = new ToolStripMenuItem(), cFull = new ToolStripMenuItem(), cGrid = new ToolStripMenuItem();
         // Immagine, informazioni, barra di stato
         readonly ImageCanvas canvas = new ImageCanvas();
         readonly Panel infoPanel = new Panel();
@@ -614,7 +615,7 @@ namespace AppImg
             Glyph(bDelete, Glyphs.Delete); bDelete.Click += delegate { DeleteCurrent(); };
             foreach (var b in new ToolStripItem[] { bOpen, bPrev, bNext, bZoomOut, bFit, bZoomIn, bRotL, bRotR, bDelete })
                 b.DisplayStyle = ToolStripItemDisplayStyle.Image;
-            foreach (var b in new ToolStripItem[] { bOpen, bPrev, bNext, bZoomOut, bFit, b100, bZoomIn, bRotL, bRotR, bDelete, bSaveAs, bConvert, bInfo, bFull, bMore })
+            foreach (var b in new ToolStripItem[] { bOpen, bPrev, bNext, bZoomOut, bFit, b100, bZoomIn, bRotL, bRotR, bDelete, bSaveAs, bConvert, bInfo, bFull, bMore, bGrid })
                 b.Padding = new Padding(S(4), S(2), S(4), S(2));
 
             // A destra (aggiunti da destra verso sinistra)
@@ -631,7 +632,8 @@ namespace AppImg
                 Mi(cvOpen, delegate { Program.OpenConverter(null); })
             });
             Glyph(bSaveAs, Glyphs.SaveAs); bSaveAs.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText; bSaveAs.Click += delegate { SaveAs(); };
-            foreach (var b in new ToolStripItem[] { bMore, bFull, bInfo, bConvert, bSaveAs })
+            Glyph(bGrid, Glyphs.Grid); bGrid.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText; bGrid.Click += delegate { OpenGrid(); };
+            foreach (var b in new ToolStripItem[] { bMore, bFull, bInfo, bConvert, bSaveAs, bGrid })
                 b.Alignment = ToolStripItemAlignment.Right;
 
             // Menu "Altro"
@@ -687,14 +689,15 @@ namespace AppImg
             {
                 bOpen, new ToolStripSeparator(), bPrev, bNext, new ToolStripSeparator(),
                 bZoomOut, bFit, b100, bZoomIn, new ToolStripSeparator(), bRotL, bRotR, new ToolStripSeparator(), bDelete,
-                bMore, bFull, bInfo, new ToolStripSeparator { Alignment = ToolStripItemAlignment.Right }, bConvert, bSaveAs
+                bMore, bFull, bInfo, new ToolStripSeparator { Alignment = ToolStripItemAlignment.Right }, bConvert, bSaveAs, bGrid
             });
         }
 
         void BuildContextMenu()
         {
             Glyph(cSave, Glyphs.SaveAs); Glyph(cConvert, Glyphs.Convert); Glyph(cCopy, Glyphs.Copy); Glyph(cFolder, Glyphs.Folder);
-            Glyph(cRotL, Glyphs.Rotate, true); Glyph(cRotR, Glyphs.Rotate); Glyph(cDelete, Glyphs.Delete); Glyph(cInfo, Glyphs.Info); Glyph(cFull, Glyphs.FullScreen);
+            Glyph(cRotL, Glyphs.Rotate, true); Glyph(cRotR, Glyphs.Rotate); Glyph(cDelete, Glyphs.Delete); Glyph(cInfo, Glyphs.Info); Glyph(cFull, Glyphs.FullScreen); Glyph(cGrid, Glyphs.Grid);
+            cGrid.ShortcutKeyDisplayString = "G";
             cSave.ShortcutKeyDisplayString = "Ctrl+S";
             cConvert.ShortcutKeyDisplayString = "Ctrl+E";
             cCopy.ShortcutKeyDisplayString = "Ctrl+C";
@@ -707,6 +710,7 @@ namespace AppImg
             {
                 Mi(cSave, delegate { SaveAs(); }),
                 Mi(cConvert, delegate { ConvertThis(); }),
+                Mi(cGrid, delegate { OpenGrid(); }),
                 Mi(cCopy, delegate { CopyCurrent(); }),
                 Mi(cFolder, delegate { if (Current != null) Util.SelectInExplorer(Current); }),
                 new ToolStripSeparator(),
@@ -721,7 +725,7 @@ namespace AppImg
             ctx.Opening += (s, e) =>
             {
                 bool has = Current != null;
-                foreach (var m in new[] { cSave, cConvert, cCopy, cFolder, cRotL, cRotR, cDelete }) m.Enabled = has;
+                foreach (var m in new[] { cSave, cConvert, cCopy, cFolder, cRotL, cRotR, cDelete, cGrid }) m.Enabled = has;
                 cInfo.Checked = infoPanel.Visible;
                 cFull.Checked = fullScreen;
             };
@@ -783,6 +787,8 @@ namespace AppImg
             cvFolder.Text = files.Count > 1 && folder != null ? L.F("Converti tutte le immagini della cartella ({0})...", "Convert all images in the folder ({0})...", files.Count)
                                                              : L.T("Converti tutte le immagini aperte...", "Convert all open images...");
             cvOpen.Text = L.T("Apri il convertitore", "Open the converter");
+            bGrid.Text = L.T("Griglia IA", "AI grid");
+            bGrid.ToolTipText = L.T("Dividi l'immagine a scacchiera e migliora i riquadri con l'IA (G)", "Divide the image into a grid and enhance tiles with AI (G)");
             bInfo.ToolTipText = L.T("Informazioni sull'immagine (I)", "Image information (I)");
             bFull.ToolTipText = L.T("Schermo intero (F11)", "Full screen (F11)");
             bMore.ToolTipText = L.T("Altro", "More");
@@ -806,6 +812,7 @@ namespace AppImg
             cRotL.Text = L.T("Ruota a sinistra", "Rotate left");
             cRotR.Text = L.T("Ruota a destra", "Rotate right");
             cDelete.Text = L.T("Sposta nel Cestino", "Move to Recycle Bin");
+            cGrid.Text = L.T("Griglia IA...", "AI grid...");
             cInfo.Text = L.T("Informazioni", "Information");
             cFull.Text = L.T("Schermo intero", "Full screen");
             tips.SetToolTip(canvas, null);
@@ -1148,7 +1155,7 @@ namespace AppImg
 
         // ===================== Azioni =====================
 
-        static void ApplyTurns(Image img, int t)
+        internal static void ApplyTurns(Image img, int t)
         {
             t = ((t % 4) + 4) % 4;
             if (t == 1) img.RotateFlip(RotateFlipType.Rotate90FlipNone);
@@ -1210,6 +1217,18 @@ namespace AppImg
                 ShowFlash(L.T("Immagine copiata negli appunti.", "Image copied to the clipboard."));
             }
             catch { }
+        }
+
+        // Griglia IA sull'immagine mostrata (con la rotazione non ancora salvata)
+        void OpenGrid()
+        {
+            string p = Current;
+            if (p == null) return;
+            var pic = cache.Get(p);
+            if (pic != null && pic.Animated) { ShowFlash(L.T("La griglia IA non funziona con le GIF animate.", "The AI grid does not work with animated GIFs.")); return; }
+            int t;
+            turns.TryGetValue(p, out t);
+            Program.OpenGrid(p, t);
         }
 
         void ConvertThis()
@@ -1388,6 +1407,7 @@ namespace AppImg
                 case Keys.Control | Keys.S: case Keys.Control | Keys.Shift | Keys.S: SaveAs(); return true;
                 case Keys.Control | Keys.C: CopyCurrent(); return true;
                 case Keys.Control | Keys.E: ConvertThis(); return true;
+                case Keys.G: OpenGrid(); return true;
                 case Keys.Control | Keys.W: Close(); return true;
             }
             return base.ProcessCmdKey(ref msg, keyData);

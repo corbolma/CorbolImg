@@ -75,6 +75,13 @@ namespace AppImg
             return v;
         }
 
+        public static void OpenGrid(string path, int quarterTurns)
+        {
+            var g = new GridForm(path, quarterTurns);
+            Track(g);
+            g.Show();
+        }
+
         public static void OpenConverter(IEnumerable<string> paths)
         {
             if (converter == null || converter.IsDisposed)
@@ -96,6 +103,8 @@ namespace AppImg
                 if (v != null) v.ApplyTexts();
                 var c = f as ConverterForm;
                 if (c != null) c.ApplyTexts();
+                var g = f as GridForm;
+                if (g != null) g.ApplyTexts();
             }
         }
 

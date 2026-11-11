@@ -232,6 +232,13 @@ namespace AppImg.Setup
                 if (Directory.Exists(settings)) Directory.Delete(settings, true);
             }
             catch { }
+            try
+            {
+                // Real-ESRGAN scaricato dalla Griglia IA
+                string engine = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AppImg");
+                if (Directory.Exists(engine)) Directory.Delete(engine, true);
+            }
+            catch { }
             try { if (File.Exists(ExePath)) File.Delete(ExePath); } catch { }
 
             // L'uninstaller gira dalla cartella da eliminare: la cancella un cmd dopo la nostra uscita.
