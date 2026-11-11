@@ -305,7 +305,8 @@ Rules: cell names always refer to the current board at that point of the sequenc
         readonly Label lCell = new Label(), lPreview = new Label(), lModel = new Label(), lScale = new Label(), lAi = new Label(), lProvider = new Label();
         readonly PictureBox preview = new PictureBox();
         readonly ComboBox cModel = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList }, cScale = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
-        readonly Button btEnhance = new Button(), btSave = new Button(), btEnter = new Button(), btSend = new Button();
+        readonly Button btEnhance = new Button(), btSave = new Button(), btEnter = new Button(), btSend = new Button(), btMic = new Button();
+        readonly ToolTip tips = new ToolTip();
         readonly LinkLabel lnkSettings = new LinkLabel();
         readonly RichTextBox log = new RichTextBox();
         readonly TextBox input = new TextBox();
@@ -450,10 +451,33 @@ Rules: cell names always refer to the current board at that point of the sequenc
                 if (e.KeyCode == Keys.Enter && !e.Shift) { e.SuppressKeyPress = true; SendOrStop(); }
             };
             btSend.Click += delegate { SendOrStop(); };
+            btMic.Image = Glyphs.Make(Glyphs.Mic, S(18), Color.FromArgb(50, 50, 50));
+            btMic.Click += delegate { Dictate(); };
 
             side.Controls.AddRange(new Control[] { lCell, preview, lPreview, lModel, cModel, lScale, cScale, btEnhance, btSave, btEnter,
-                                                   lAi, lnkSettings, lProvider, log, input, btSend });
+                                                   lAi, lnkSettings, lProvider, log, input, btMic, btSend });
             side.Resize += delegate { LayoutSide(); };
+        }
+
+        // Dettatura: si mette il cursore in fondo alla richiesta e si apre la dettatura vocale di Windows (Win+H),
+        // che scrive nella casella che ha il fuoco. Riconoscimento di Windows: AppImg non tocca il microfono.
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, int flags, IntPtr extra);
+
+        void Dictate()
+        {
+            input.Focus();
+            input.SelectionStart = input.TextLength;
+            if (input.TextLength > 0 && !char.IsWhiteSpace(input.Text[input.TextLength - 1])) input.AppendText(" ");
+            // Dopo che il fuoco è arrivato alla casella
+            BeginInvoke((Action)delegate
+            {
+                const byte LWin = 0x5B, H = 0x48;
+                const int KeyUp = 2;
+                keybd_event(LWin, 0, 0, IntPtr.Zero);
+                keybd_event(H, 0, 0, IntPtr.Zero);
+                keybd_event(H, 0, KeyUp, IntPtr.Zero);
+                keybd_event(LWin, 0, KeyUp, IntPtr.Zero);
+            });
         }
 
         void LayoutSide()
@@ -473,6 +497,7 @@ Rules: cell names always refer to the current board at that point of the sequenc
             lProvider.SetBounds(x, y, w, S(18)); y += S(22);
             int bottom = side.ClientSize.Height - side.Padding.Bottom;
             btSend.SetBounds(x + w - S(80), bottom - S(30), S(80), S(30));
+            btMic.SetBounds(btSend.Left - S(38), bottom - S(30), S(32), S(30));
             input.SetBounds(x, bottom - S(36) - S(58), w, S(58));
             log.SetBounds(x, y, w, Math.Max(S(40), input.Top - S(6) - y));
         }
@@ -491,6 +516,7 @@ Rules: cell names always refer to the current board at that point of the sequenc
             btEnter.Text = L.T("Suddividi riquadro", "Subdivide tile");
             lAi.Text = L.T("Assistente", "Assistant");
             lnkSettings.Text = L.T("Impostazioni", "Settings");
+            tips.SetToolTip(btMic, L.T("Detta la richiesta (dettatura vocale di Windows, Win+H)", "Dictate the request (Windows voice typing, Win+H)"));
             sStop.Text = L.T("Annulla", "Cancel");
             cModel.Refresh();
             UpdateUi();
@@ -515,7 +541,7 @@ Rules: cell names always refer to the current board at that point of the sequenc
             btSave.Enabled = btEnter.Enabled = sel && !Busy;
             cModel.Enabled = cScale.Enabled = !Busy;
             btSend.Text = aiRunning ? L.T("Stop", "Stop") : L.T("Invia", "Send");
-            btSend.Enabled = has;
+            btSend.Enabled = btMic.Enabled = has;
             lProvider.Text = AiSettings.Describe();
 
             if (preview.Image != null) { var old = preview.Image; preview.Image = null; old.Dispose(); }

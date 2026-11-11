@@ -166,6 +166,7 @@ Save tile... =
 Subdivide tile = 
 Assistant = 
 Settings = 
+Dictate the request (Windows voice typing, Win+H) = 
 Enhance with AI = 
 Stop = 
 Send = 

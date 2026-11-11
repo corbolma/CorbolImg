@@ -21,7 +21,7 @@ namespace AppImg
         public const char Open = '', Prev = '', Next = '', ZoomOut = '', ZoomIn = '',
             Fit = '', Rotate = '', Delete = '', Info = '', FullScreen = '',
             SaveAs = '', Convert = '', More = '', Copy = '', Folder = '', Slideshow = '',
-            Grid = '';
+            Grid = '', Mic = '';
 
         static string font;
         static string Font
