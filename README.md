@@ -3,7 +3,7 @@
 <p align="center">
   Visualizzatore di immagini per Windows, leggero e veloce, con convertitore integrato.<br>
   Apre JPEG, PNG, HEIC, WebP, AVIF, TIFF, GIF animate, RAW e altri; salva in PNG, JPEG, WebP, HEIC, TIFF, BMP, GIF, JPEG XR, ICO o PDF.<br>
-  <a href="#english">English below</a>
+  <a href="#english">English below</a> · <a href="https://github.com/corbolma/AppImg/wiki">Wiki</a>
 </p>
 
 <p align="center">
@@ -89,21 +89,73 @@ AppImg non raccoglie dati e lavora solo sul tuo PC: le immagini non vengono mai 
 
 ## English
 
-<p align="center"><img src="docs/viewer-en.png" alt="AppImg in English" width="640"></p>
+<p align="center"><img src="docs/viewer-en.png" alt="AppImg in English: a photo with the information panel" width="640"></p>
 
-**AppImg** is a fast, lightweight image viewer for Windows 10/11 with a built-in converter.
+**AppImg** is a fast, lightweight image viewer for Windows 10/11 with a built-in converter. It opens JPEG, PNG, HEIC, WebP, AVIF, TIFF, animated GIF, RAW and more; it saves to PNG, JPEG, WebP, HEIC, TIFF, BMP, GIF, JPEG XR, ICO or PDF. Full documentation: [wiki (English)](https://github.com/corbolma/AppImg/wiki/English).
 
-- **View:** open an image and browse the rest of its folder with ← →, the mouse side buttons or the on-screen arrows. Mouse-wheel zoom around the cursor, fit to window, actual size, drag to pan, rotate, full screen (F11), slideshow (F5). Animated GIFs play, transparency is shown on a checkerboard, phone photos are shown upright (EXIF orientation).
-- **Info panel** (I): format, dimensions, file size, date taken, camera, exposure (aperture, shutter, ISO, focal length) and GPS location with a map link.
-- **Convert:** *Save as* (Ctrl+S) saves the current image in another format with the rotation applied; *Convert* (Ctrl+E) opens a batch converter for this image, the whole folder, or any files and folders you drop in — with quality, optional downscaling and destination folder. While you change format, quality or size, an **Estimated** column shows each file's new size and the status bar shows the estimated total vs. the current one (images are actually encoded in memory, so the estimate matches the result). File Explorer → right-click → **Send to → AppImg** opens the converter directly.
-- **Reads** anything Windows can decode: BMP, PNG, JPEG, GIF, TIFF, ICO, JPEG XR, plus **HEIC/HEIF**, **WebP**, **AVIF**, **JPEG XL** and camera **RAW** when the free Microsoft Store extensions are installed. **Writes** PNG, JPEG, TIFF, BMP, GIF, JPEG XR, **ICO** (16–256 px) and **PDF**; **WebP** and **HEIC** when the matching encoder is installed. The original is never overwritten.
-- **AI grid** (G): divides the image like a chessboard (columns A, B, C..., rows 1, 2, 3...). Each tile can be **enhanced** ×2/×3/×4 with [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) running locally on the GPU (integrated Intel/AMD graphics with Vulkan drivers work too), **saved** on its own, or **subdivided** into a new grid, again and again. An **assistant** drives it from plain requests (*"enhance F3 and save it"*, *"find the plate and make it readable"*): **Claude Code** (Claude subscription, no key, default), **Claude** (Anthropic API key) or any **OpenAI-compatible** vision model. Real-ESRGAN (BSD-3-Clause) is downloaded from its official GitHub release on first use after asking (~45 MB, SHA-256 verified) into `%LOCALAPPDATA%\AppImg\realesrgan`.
-- **Install:** download `AppImg-Setup-X.Y.Z.exe` from [Releases](https://github.com/corbolma/AppImg/releases/latest). Per-user install, no admin rights required; it registers AppImg in *Open with* and *Default apps* (Windows lets only the user pick the default app: answer *Yes* at the end of setup, or use menu **⋯ → Set as default image viewer**). The executable is not code-signed, so SmartScreen may ask you to confirm (*More info → Run anyway*). Silent install: `/silent`.
-- **Updates:** menu ⋯ → *Check for updates* downloads the installer from GitHub Releases and verifies its SHA-256. Automatic daily check is off by default.
-- **Build:** run `build-installer.bat` — it uses the C# compiler bundled with Windows (.NET Framework 4.x), no SDK needed.
-- **Privacy:** no telemetry. Outbound requests: the update check (`api.github.com`), the one-time Real-ESRGAN download after you confirm, and in the AI grid the assistant you chose, which gets your text and, unless you turn it off, a reduced view of the grid. Tile enhancement always runs on your PC. Metadata is not copied to converted files.
+### Viewer
+- **Open an image and browse the others** in the same folder with the ← → keys, the mouse side buttons or the arrows that appear at the sides of the window.
+- **Zoom** with the mouse wheel (around the pointer), *Fit to window*, *Actual size*; drag to pan around large images; double-click to switch between fit and 100%.
+- **Rotation**, **full screen** (F11) and **slideshow** (F5).
+- **Information panel** (I): format, dimensions, file size, date taken, camera, exposure (aperture, shutter, ISO, focal length) and GPS location with a map link.
+- **Animated GIFs** play, **transparency** is shown on a checkerboard, **phone photos are upright** according to their EXIF orientation.
+- **Copy** (Ctrl+C) the image to paste it into another program, or the file into File Explorer; **Move to Recycle Bin** (Del).
+- Nearby images are prepared in advance, so switching between them is instant.
 
-The user interface is available in **English and Italian**: it follows the Windows display language and can be changed from menu ⋯ → *Lingua / Language*.
+### Converter
+- **Save as** (Ctrl+S): saves the open image in another format, with the rotation applied.
+- **Convert** (Ctrl+E): a window to convert **many images at once**: this one, all those in the folder, or files and folders dragged in. Adjustable quality (JPEG, JPEG XR, PDF), optional downscaling (maximum long side, width × height with or without locked aspect ratio, or percentage; images are never enlarged), destination folder of your choice. While you change format, quality or downscaling, the **Estimated** column shows how big each file will be and the bottom bar shows the **estimated total** against the current one (e.g. *≈ 711 KB, now 6.4 MB, −89%*): images are actually encoded in memory, so the estimate matches the result.
+- Output formats: PNG, JPEG, TIFF, BMP, GIF, JPEG XR, **ICO** (icon from 16 to 256 px) and **PDF** (one page per image). **WebP** and **HEIC** appear if the matching encoder is installed on the PC.
+- Transparency is kept in the formats that support it; in the others it becomes white. The original is never overwritten: if the file exists, `photo (1).png` is created, unless you choose otherwise.
+- From File Explorer: select the images → right-click → **Send to → AppImg** opens the converter directly.
+
+### AI grid
+The **AI grid** button (**G** key) divides the image like a chessboard: columns A, B, C... and rows 1, 2, 3..., so every tile has a name (A1 is top left). Choose the number of columns and rows, click a tile and:
+- **Enhance with AI**: enlarges it ×2, ×3 or ×4 with [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN), a neural network that reconstructs detail instead of blurring. Models *Photo*, *Drawings and graphics* and *Fast*. It runs **on your PC** on the graphics card (integrated Intel/AMD graphics with Vulkan drivers work too): images never leave the computer.
+- **Save tile**: saves only that tile (the enhanced version, if there is one), with a name like `photo_F3_x4.png`.
+- **Subdivide tile** (double-click or Enter): the tile becomes a new chessboard to divide again, and so on, deeper and deeper (`photo_F3-B2_x4.png`). **Back** (Backspace) returns to the previous level.
+
+**Assistant**: write what you want and it does it, driving Real-ESRGAN: *"enhance F3 and save it as JPEG"*, *"divide into 4×4 and zoom on B2"*, *"find the number plate and make it readable"*. It sees the chessboard (reduced, with labels), picks the tiles, enhances them, opens them, changes the grid and saves next to the original; the dialog panel shows what it did. Services: **Claude Code** (Claude subscription, no key: the default), **Claude** (Anthropic API, with key) or an **OpenAI-compatible** service with a model that can see images (OpenAI, OpenRouter, Ollama, LM Studio...). Keys are encrypted with Windows DPAPI. The 🎤 button next to **Send** opens Windows voice typing (Win+H) so you can dictate the request instead of typing it.
+
+Real-ESRGAN is not included in the installer: on the first enhancement AppImg asks for permission and downloads it from the official GitHub release (~45 MB, once), verifies its SHA-256 and puts it in `%LOCALAPPDATA%\AppImg\realesrgan` (uninstalling removes it).
+
+### Formats it reads
+AppImg uses the Windows codecs: it reads BMP, PNG, JPEG, GIF, TIFF, ICO, JPEG XR and, with the free Microsoft Store extensions, also **HEIC/HEIF** (iPhone photos), **WebP**, **AVIF**, **JPEG XL** and camera **RAW** files (CR2, CR3, NEF, ARW, DNG, ORF, RW2...). If an image won't open, install the matching extension: *HEIF Image Extensions* (with *HEVC Video Extensions*), *WebP Image Extensions*, *AV1 Video Extension*, *Raw Image Extension*.
+
+### Keys
+| Key | Action | Key | Action |
+|---|---|---|---|
+| ← → · PgUp PgDn · Space | previous / next image | Ctrl+O | open |
+| Home · End | first / last | Ctrl+S | save as |
+| + − · wheel | zoom | Ctrl+E | convert |
+| 0 · 1 | fit · actual size | Ctrl+C | copy |
+| R · Shift+R | rotate right / left | Del | move to Recycle Bin |
+| F11 · F · Esc | full screen | I | information |
+| F5 | slideshow | Ctrl+W | close |
+| G | AI grid | | |
+
+### Installation
+1. Download `AppImg-Setup-X.Y.Z.exe` from [Releases](https://github.com/corbolma/AppImg/releases/latest).
+2. Run it. **No administrator rights needed**: it installs for the current user only.
+3. If *"Windows protected your PC"* appears, click **More info → Run anyway** (the executable is not code-signed).
+4. To open images with AppImg on double-click: at the end of setup answer **Yes** and choose AppImg in *Settings → Default apps* (Windows does not let programs do it themselves). You can also do it later from menu **⋯ → Set as default image viewer**, or right-click an image → *Open with* → *Choose another app* → AppImg → *Always*.
+
+Silent install (for IT): `AppImg-Setup-X.Y.Z.exe /silent` · Uninstall: Settings → Apps, or `"%LOCALAPPDATA%\Programs\AppImg\Uninstall.exe" /uninstall /silent`.
+
+From the **⋯** menu: language (English and Italian, following Windows; more languages can be added with a text file, see [lang/README.md](lang/README.md)), **updates** (*Check for updates* downloads the installer from Releases and verifies its SHA-256; the automatic daily check is off by default) and *About AppImg*.
+
+### Building from source
+Nothing to install: it uses the C# compiler that ships with Windows (.NET Framework 4.x).
+
+```bat
+build.bat                      :: builds AppImg.exe
+build-installer.bat            :: builds dist\AppImg-Setup-X.Y.Z.exe
+build-installer.bat patch      :: bumps the version (1.0.0 -> 1.0.1) and builds the installer
+```
+
+### Privacy
+AppImg collects no data and works only on your PC: images are never sent anywhere. The only connections are: the update check (`api.github.com`), when you ask for it or if you turn on the automatic one; the Real-ESRGAN download from GitHub, once and after you confirm; and, in the AI grid, the requests to the **assistant** you chose, which gets the text you write and, if you leave it on in the settings, the reduced chessboard (tile enhancement stays on your PC); the GPS location link opens OpenStreetMap only if you click it. Dictation (🎤) is Windows' own: AppImg does not access the microphone, speech recognition is handled by Windows according to its settings. Metadata (EXIF, GPS location...) is **not** copied to converted files.
+
 **Translations are welcome**: adding a language is just a text file, no coding required — see [lang/README.md](lang/README.md).
 
 ## License
