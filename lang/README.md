@@ -1,7 +1,7 @@
 # Translations
 
-AppImg is available in **Italian** and **English** (written in the source code).
-Any other language is a plain text file in this folder, embedded into `AppImg.exe` and the installer at build time.
+CorbolImg is available in **Italian** and **English** (written in the source code).
+Any other language is a plain text file in this folder, embedded into `CorbolImg.exe` and the installer at build time.
 No programming needed: translations are very welcome as pull requests.
 
 ## Add a language

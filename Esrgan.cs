@@ -1,7 +1,7 @@
 // Real-ESRGAN (ncnn-vulkan, licenza BSD-3-Clause): ingrandisce un'immagine x2/x3/x4 ricostruendo i dettagli
 // con una rete neurale, sul PC (scheda video Vulkan: anche le grafiche integrate Intel/AMD).
 // Non è incluso nell'installer: si scarica al primo uso (~45 MB) dalla release ufficiale su GitHub,
-// si controlla lo SHA-256 e si estrae in %LOCALAPPDATA%\AppImg\realesrgan.
+// si controlla lo SHA-256 e si estrae in %LOCALAPPDATA%\CorbolImg\realesrgan.
 // Compatibile con il compilatore csc di .NET Framework 4.x (C# 5).
 using System;
 using System.Diagnostics;
@@ -15,7 +15,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 
-namespace AppImg
+namespace CorbolImg
 {
     class EsrganModel
     {
@@ -46,19 +46,19 @@ namespace AppImg
             return Models[0];
         }
 
-        public static string Dir { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AppImg", "realesrgan"); } }
+        public static string Dir { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CorbolImg", "realesrgan"); } }
         static string Exe { get { return Path.Combine(Dir, "realesrgan-ncnn-vulkan.exe"); } }
         public static bool Installed { get { return File.Exists(Exe) && File.Exists(Path.Combine(Dir, "models", "realesrgan-x4plus.bin")); } }
 
         // Scarica ed estrae. Bloccante; progress riceve 0..100. Restituisce null o il messaggio d'errore.
         public static string Install(Action<int> progress, CancellationToken cancel)
         {
-            string tmp = Path.Combine(Path.GetTempPath(), "AppImg-realesrgan-" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".zip");
+            string tmp = Path.Combine(Path.GetTempPath(), "CorbolImg-realesrgan-" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".zip");
             try
             {
                 try { ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; } catch { }
                 var req = (HttpWebRequest)WebRequest.Create(Url);
-                req.UserAgent = "AppImg/" + AppVersion.Text;
+                req.UserAgent = "CorbolImg/" + AppVersion.Text;
                 req.Timeout = 30000;
                 req.ReadWriteTimeout = 60000;
                 using (cancel.Register(delegate { try { req.Abort(); } catch { } }))
@@ -131,7 +131,7 @@ namespace AppImg
                             "Tile too large for x{0} ({1}×{2} px): subdivide it or pick a smaller scale.", scale, src.Width, src.Height);
                 return null;
             }
-            string work = Path.Combine(Path.GetTempPath(), "AppImg-esrgan-" + Guid.NewGuid().ToString("N").Substring(0, 8));
+            string work = Path.Combine(Path.GetTempPath(), "CorbolImg-esrgan-" + Guid.NewGuid().ToString("N").Substring(0, 8));
             Process p = null;
             var log = new StringBuilder();
             try

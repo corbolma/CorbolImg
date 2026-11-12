@@ -1,4 +1,4 @@
-// Lingua dell'interfaccia, condivisa da AppImg.exe e dall'installer.
+// Lingua dell'interfaccia, condivisa da CorbolImg.exe e dall'installer.
 //
 // Italiano e inglese sono scritti nel codice: L.T("testo italiano", "English text").
 // Le altre lingue sono file lang\<codice>.txt (es. lang\de.txt, lang\pt-BR.txt) incorporati
@@ -12,7 +12,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 
-namespace AppImg
+namespace CorbolImg
 {
     static class L
     {
@@ -22,7 +22,7 @@ namespace AppImg
             public Dictionary<string, string> Texts;
         }
 
-        const string ResPrefix = "AppImg.lang.";
+        const string ResPrefix = "CorbolImg.lang.";
         static List<Language> all;
         static Language current;
 
@@ -113,13 +113,15 @@ namespace AppImg
             current = lang;
         }
 
-        // Legge la scelta salvata dall'app in %APPDATA%\AppImg\settings.txt (usata dall'installer).
+        // Legge la scelta salvata dall'app in %APPDATA%\CorbolImg\settings.txt (usata dall'installer).
         public static void LoadFromSettings()
         {
             string v = "auto";
             try
             {
-                string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AppImg", "settings.txt");
+                string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CorbolImg", "settings.txt");
+                // prima del cambio di nome le impostazioni erano nella cartella col nome vecchio
+                if (!File.Exists(path)) path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), OldApp.Name, "settings.txt");
                 if (File.Exists(path))
                     foreach (var ln in File.ReadAllLines(path))
                         if (ln.StartsWith("lang=")) v = ln.Substring(5).Trim();

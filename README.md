@@ -1,18 +1,20 @@
-<h1 align="center">AppImg</h1>
+<h1 align="center">CorbolImg</h1>
+
+<p align="center"><sub>Prima si chiamava <b>AppImg</b> (fino alla versione 1.3.0): chi ha già installato la versione vecchia riceve CorbolImg con l'aggiornamento automatico, con impostazioni e dati.<br>Formerly <b>AppImg</b> (up to version 1.3.0): existing installations get CorbolImg through the automatic update, keeping settings and data.</sub></p>
 
 <p align="center">
   Visualizzatore di immagini per Windows, leggero e veloce, con convertitore integrato.<br>
   Apre JPEG, PNG, HEIC, WebP, AVIF, TIFF, GIF animate, RAW e altri; salva in PNG, JPEG, WebP, HEIC, TIFF, BMP, GIF, JPEG XR, ICO o PDF.<br>
-  <a href="#english">English below</a> · <a href="https://github.com/corbolma/AppImg/wiki">Wiki</a>
+  <a href="#english">English below</a> · <a href="https://github.com/corbolma/CorbolImg/wiki">Wiki</a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/corbolma/AppImg/releases/latest"><b>⬇ Scarica l'ultima versione</b></a> ·
-  <a href="https://github.com/corbolma/AppImg/issues">Segnala un problema</a>
+  <a href="https://github.com/corbolma/CorbolImg/releases/latest"><b>⬇ Scarica l'ultima versione</b></a> ·
+  <a href="https://github.com/corbolma/CorbolImg/issues">Segnala un problema</a>
 </p>
 
 <p align="center">
-  <img src="docs/visualizzatore.png" alt="AppImg: una foto con il pannello informazioni" width="720">
+  <img src="docs/visualizzatore.png" alt="CorbolImg: una foto con il pannello informazioni" width="720">
 </p>
 <p align="center"><sub>Il visualizzatore con il pannello informazioni (immagini di esempio)</sub></p>
 
@@ -34,9 +36,9 @@
 - **Converti** (Ctrl+E): una finestra per convertire **molte immagini insieme**: questa, tutte quelle della cartella, oppure file e cartelle trascinati dentro. Qualità regolabile (JPEG, JPEG XR, PDF), riduzione opzionale (lato lungo massimo, larghezza × altezza con o senza proporzioni bloccate, oppure percentuale; le immagini non vengono mai ingrandite), cartella di destinazione a scelta. Mentre cambi formato, qualità o riduzione, la colonna **Previsto** mostra il peso che avrà ogni file e in basso compare il **totale previsto** rispetto a quello attuale (es. *≈ 711 KB, ora 6,4 MB, −89%*): le immagini vengono codificate davvero in memoria, quindi la stima coincide con il risultato.
 - Formati in uscita: PNG, JPEG, TIFF, BMP, GIF, JPEG XR, **ICO** (icona da 16 a 256 px) e **PDF** (una pagina per immagine). **WebP** e **HEIC** compaiono se sul PC è installato il relativo encoder.
 - La trasparenza resta nei formati che la supportano; negli altri diventa bianca. L'originale non viene mai sovrascritto: se il file esiste viene creato `foto (1).png`, salvo scelta diversa.
-- Da Esplora file: seleziona le immagini → tasto destro → **Invia a → AppImg** apre direttamente il convertitore.
+- Da Esplora file: seleziona le immagini → tasto destro → **Invia a → CorbolImg** apre direttamente il convertitore.
 
-<p align="center"><img src="docs/convertitore.png" alt="AppImg: sei immagini da convertire in JPEG, ridotte e con il peso previsto" width="620"></p>
+<p align="center"><img src="docs/convertitore.png" alt="CorbolImg: sei immagini da convertire in JPEG, ridotte e con il peso previsto" width="620"></p>
 
 ### Griglia IA
 Il pulsante **Griglia IA** (tasto **G**) divide l'immagine come una scacchiera: colonne A, B, C... e righe 1, 2, 3..., quindi ogni riquadro ha un nome (A1 è in alto a sinistra). Scegli il numero di colonne e righe, clicca un riquadro e:
@@ -46,10 +48,10 @@ Il pulsante **Griglia IA** (tasto **G**) divide l'immagine come una scacchiera: 
 
 **Assistente**: scrivi cosa vuoi fare e lo fa lui, comandando Real-ESRGAN: *«migliora F3 e salvalo in JPEG»*, *«dividi in 4×4 e zooma su B2»*, *«trova la targa e rendila leggibile»*. Vede la scacchiera (ridotta, con le etichette), sceglie i riquadri, li migliora, li apre, cambia griglia e salva accanto all'originale; nel riquadro di dialogo scrive cosa ha fatto. Servizi: **Claude Code** (abbonamento Claude, nessuna chiave: è quello predefinito), **Claude** (API Anthropic, con chiave) o un servizio **compatibile OpenAI** con un modello che vede le immagini (OpenAI, OpenRouter, Ollama, LM Studio...). Le chiavi sono cifrate con DPAPI di Windows. Il pulsante 🎤 accanto a **Invia** apre la dettatura vocale di Windows (Win+H) per dettare la richiesta invece di scriverla.
 
-Real-ESRGAN non è incluso nell'installer: al primo miglioramento AppImg chiede il permesso e lo scarica dalla release ufficiale su GitHub (~45 MB, una sola volta), ne verifica lo SHA-256 e lo mette in `%LOCALAPPDATA%\AppImg\realesrgan` (la disinstallazione lo rimuove).
+Real-ESRGAN non è incluso nell'installer: al primo miglioramento CorbolImg chiede il permesso e lo scarica dalla release ufficiale su GitHub (~45 MB, una sola volta), ne verifica lo SHA-256 e lo mette in `%LOCALAPPDATA%\CorbolImg\realesrgan` (la disinstallazione lo rimuove).
 
 ### Formati letti
-AppImg usa i codec di Windows: legge BMP, PNG, JPEG, GIF, TIFF, ICO, JPEG XR e, con le estensioni gratuite del Microsoft Store, anche **HEIC/HEIF** (foto di iPhone), **WebP**, **AVIF**, **JPEG XL** e i **RAW** delle fotocamere (CR2, CR3, NEF, ARW, DNG, ORF, RW2...). Se un'immagine non si apre, installa l'estensione corrispondente: *Estensioni immagine HEIF* (con *Estensioni video HEVC*), *Estensioni immagine WebP*, *Estensione video AV1*, *Raw Image Extension*.
+CorbolImg usa i codec di Windows: legge BMP, PNG, JPEG, GIF, TIFF, ICO, JPEG XR e, con le estensioni gratuite del Microsoft Store, anche **HEIC/HEIF** (foto di iPhone), **WebP**, **AVIF**, **JPEG XL** e i **RAW** delle fotocamere (CR2, CR3, NEF, ARW, DNG, ORF, RW2...). Se un'immagine non si apre, installa l'estensione corrispondente: *Estensioni immagine HEIF* (con *Estensioni video HEVC*), *Estensioni immagine WebP*, *Estensione video AV1*, *Raw Image Extension*.
 
 ### Tasti
 | Tasto | Azione | Tasto | Azione |
@@ -64,34 +66,34 @@ AppImg usa i codec di Windows: legge BMP, PNG, JPEG, GIF, TIFF, ICO, JPEG XR e, 
 | G | griglia IA | | |
 
 ### Installazione
-1. Scarica `AppImg-Setup-X.Y.Z.exe` dalle [Releases](https://github.com/corbolma/AppImg/releases/latest).
+1. Scarica `CorbolImg-Setup-X.Y.Z.exe` dalle [Releases](https://github.com/corbolma/CorbolImg/releases/latest).
 2. Avvialo. **Non servono permessi di amministratore**: installa solo per l'utente corrente.
 3. Se compare *"Windows ha protetto il PC"*, clicca **Ulteriori informazioni → Esegui comunque** (l'eseguibile non è firmato digitalmente).
-4. Per aprire le immagini con AppImg con un doppio clic: al termine dell'installazione rispondi **Sì** e scegli AppImg in *Impostazioni → App predefinite* (Windows non permette ai programmi di farlo da soli). Si può fare anche dopo, dal menu **⋯ → Imposta come visualizzatore predefinito**, oppure con tasto destro su un'immagine → *Apri con* → *Scegli un'altra app* → AppImg → *Sempre*.
+4. Per aprire le immagini con CorbolImg con un doppio clic: al termine dell'installazione rispondi **Sì** e scegli CorbolImg in *Impostazioni → App predefinite* (Windows non permette ai programmi di farlo da soli). Si può fare anche dopo, dal menu **⋯ → Imposta come visualizzatore predefinito**, oppure con tasto destro su un'immagine → *Apri con* → *Scegli un'altra app* → CorbolImg → *Sempre*.
 
-Installazione silenziosa (per l'IT): `AppImg-Setup-X.Y.Z.exe /silent` · Disinstallazione: Impostazioni → App, oppure `"%LOCALAPPDATA%\Programs\AppImg\Uninstall.exe" /uninstall /silent`.
+Installazione silenziosa (per l'IT): `CorbolImg-Setup-X.Y.Z.exe /silent` · Disinstallazione: Impostazioni → App, oppure `"%LOCALAPPDATA%\Programs\CorbolImg\Uninstall.exe" /uninstall /silent`.
 
-Dal menu **⋯**: lingua (italiano e inglese, segue quella di Windows; altre lingue si aggiungono con un file di testo, vedi [lang/README.md](lang/README.md)), **aggiornamenti** (*Controlla aggiornamenti* scarica l'installer dalle Releases e ne verifica lo SHA-256; il controllo automatico giornaliero è disattivato di default) e *Informazioni su AppImg*.
+Dal menu **⋯**: lingua (italiano e inglese, segue quella di Windows; altre lingue si aggiungono con un file di testo, vedi [lang/README.md](lang/README.md)), **aggiornamenti** (*Controlla aggiornamenti* scarica l'installer dalle Releases e ne verifica lo SHA-256; il controllo automatico giornaliero è disattivato di default) e *Informazioni su CorbolImg*.
 
 ### Compilare dal sorgente
 Non serve installare nulla: si usa il compilatore C# incluso in Windows (.NET Framework 4.x).
 
 ```bat
-build.bat                      :: crea AppImg.exe
-build-installer.bat            :: crea dist\AppImg-Setup-X.Y.Z.exe
+build.bat                      :: crea CorbolImg.exe
+build-installer.bat            :: crea dist\CorbolImg-Setup-X.Y.Z.exe
 build-installer.bat patch      :: incrementa la versione (1.0.0 -> 1.0.1) e crea l'installer
 ```
 
 ### Privacy
-AppImg non raccoglie dati e lavora solo sul tuo PC: le immagini non vengono mai inviate da nessuna parte. Le connessioni sono solo: il controllo degli aggiornamenti (`api.github.com`), quando lo chiedi o se attivi quello automatico; il download di Real-ESRGAN da GitHub, una volta e dopo la tua conferma; e, nella Griglia IA, le richieste all'**assistente** che hai scelto, che riceve il testo che scrivi e, se lo lasci attivo nelle impostazioni, la scacchiera ridotta (il miglioramento dei riquadri invece resta sul PC); il link della posizione GPS apre OpenStreetMap solo se ci clicchi. La dettatura (🎤) è quella di Windows: AppImg non accede al microfono, il riconoscimento vocale lo gestisce Windows secondo le sue impostazioni. I metadati (EXIF, posizione GPS...) **non** vengono copiati nei file convertiti.
+CorbolImg non raccoglie dati e lavora solo sul tuo PC: le immagini non vengono mai inviate da nessuna parte. Le connessioni sono solo: il controllo degli aggiornamenti (`api.github.com`), quando lo chiedi o se attivi quello automatico; il download di Real-ESRGAN da GitHub, una volta e dopo la tua conferma; e, nella Griglia IA, le richieste all'**assistente** che hai scelto, che riceve il testo che scrivi e, se lo lasci attivo nelle impostazioni, la scacchiera ridotta (il miglioramento dei riquadri invece resta sul PC); il link della posizione GPS apre OpenStreetMap solo se ci clicchi. La dettatura (🎤) è quella di Windows: CorbolImg non accede al microfono, il riconoscimento vocale lo gestisce Windows secondo le sue impostazioni. I metadati (EXIF, posizione GPS...) **non** vengono copiati nei file convertiti.
 
 ---
 
 ## English
 
-<p align="center"><img src="docs/viewer-en.png" alt="AppImg in English: a photo with the information panel" width="640"></p>
+<p align="center"><img src="docs/viewer-en.png" alt="CorbolImg in English: a photo with the information panel" width="640"></p>
 
-**AppImg** is a fast, lightweight image viewer for Windows 10/11 with a built-in converter. It opens JPEG, PNG, HEIC, WebP, AVIF, TIFF, animated GIF, RAW and more; it saves to PNG, JPEG, WebP, HEIC, TIFF, BMP, GIF, JPEG XR, ICO or PDF. Full documentation: [wiki (English)](https://github.com/corbolma/AppImg/wiki/English).
+**CorbolImg** is a fast, lightweight image viewer for Windows 10/11 with a built-in converter. It opens JPEG, PNG, HEIC, WebP, AVIF, TIFF, animated GIF, RAW and more; it saves to PNG, JPEG, WebP, HEIC, TIFF, BMP, GIF, JPEG XR, ICO or PDF. Full documentation: [wiki (English)](https://github.com/corbolma/CorbolImg/wiki/English).
 
 ### Viewer
 - **Open an image and browse the others** in the same folder with the ← → keys, the mouse side buttons or the arrows that appear at the sides of the window.
@@ -107,7 +109,7 @@ AppImg non raccoglie dati e lavora solo sul tuo PC: le immagini non vengono mai 
 - **Convert** (Ctrl+E): a window to convert **many images at once**: this one, all those in the folder, or files and folders dragged in. Adjustable quality (JPEG, JPEG XR, PDF), optional downscaling (maximum long side, width × height with or without locked aspect ratio, or percentage; images are never enlarged), destination folder of your choice. While you change format, quality or downscaling, the **Estimated** column shows how big each file will be and the bottom bar shows the **estimated total** against the current one (e.g. *≈ 711 KB, now 6.4 MB, −89%*): images are actually encoded in memory, so the estimate matches the result.
 - Output formats: PNG, JPEG, TIFF, BMP, GIF, JPEG XR, **ICO** (icon from 16 to 256 px) and **PDF** (one page per image). **WebP** and **HEIC** appear if the matching encoder is installed on the PC.
 - Transparency is kept in the formats that support it; in the others it becomes white. The original is never overwritten: if the file exists, `photo (1).png` is created, unless you choose otherwise.
-- From File Explorer: select the images → right-click → **Send to → AppImg** opens the converter directly.
+- From File Explorer: select the images → right-click → **Send to → CorbolImg** opens the converter directly.
 
 ### AI grid
 The **AI grid** button (**G** key) divides the image like a chessboard: columns A, B, C... and rows 1, 2, 3..., so every tile has a name (A1 is top left). Choose the number of columns and rows, click a tile and:
@@ -117,10 +119,10 @@ The **AI grid** button (**G** key) divides the image like a chessboard: columns 
 
 **Assistant**: write what you want and it does it, driving Real-ESRGAN: *"enhance F3 and save it as JPEG"*, *"divide into 4×4 and zoom on B2"*, *"find the number plate and make it readable"*. It sees the chessboard (reduced, with labels), picks the tiles, enhances them, opens them, changes the grid and saves next to the original; the dialog panel shows what it did. Services: **Claude Code** (Claude subscription, no key: the default), **Claude** (Anthropic API, with key) or an **OpenAI-compatible** service with a model that can see images (OpenAI, OpenRouter, Ollama, LM Studio...). Keys are encrypted with Windows DPAPI. The 🎤 button next to **Send** opens Windows voice typing (Win+H) so you can dictate the request instead of typing it.
 
-Real-ESRGAN is not included in the installer: on the first enhancement AppImg asks for permission and downloads it from the official GitHub release (~45 MB, once), verifies its SHA-256 and puts it in `%LOCALAPPDATA%\AppImg\realesrgan` (uninstalling removes it).
+Real-ESRGAN is not included in the installer: on the first enhancement CorbolImg asks for permission and downloads it from the official GitHub release (~45 MB, once), verifies its SHA-256 and puts it in `%LOCALAPPDATA%\CorbolImg\realesrgan` (uninstalling removes it).
 
 ### Formats it reads
-AppImg uses the Windows codecs: it reads BMP, PNG, JPEG, GIF, TIFF, ICO, JPEG XR and, with the free Microsoft Store extensions, also **HEIC/HEIF** (iPhone photos), **WebP**, **AVIF**, **JPEG XL** and camera **RAW** files (CR2, CR3, NEF, ARW, DNG, ORF, RW2...). If an image won't open, install the matching extension: *HEIF Image Extensions* (with *HEVC Video Extensions*), *WebP Image Extensions*, *AV1 Video Extension*, *Raw Image Extension*.
+CorbolImg uses the Windows codecs: it reads BMP, PNG, JPEG, GIF, TIFF, ICO, JPEG XR and, with the free Microsoft Store extensions, also **HEIC/HEIF** (iPhone photos), **WebP**, **AVIF**, **JPEG XL** and camera **RAW** files (CR2, CR3, NEF, ARW, DNG, ORF, RW2...). If an image won't open, install the matching extension: *HEIF Image Extensions* (with *HEVC Video Extensions*), *WebP Image Extensions*, *AV1 Video Extension*, *Raw Image Extension*.
 
 ### Keys
 | Key | Action | Key | Action |
@@ -135,26 +137,26 @@ AppImg uses the Windows codecs: it reads BMP, PNG, JPEG, GIF, TIFF, ICO, JPEG XR
 | G | AI grid | | |
 
 ### Installation
-1. Download `AppImg-Setup-X.Y.Z.exe` from [Releases](https://github.com/corbolma/AppImg/releases/latest).
+1. Download `CorbolImg-Setup-X.Y.Z.exe` from [Releases](https://github.com/corbolma/CorbolImg/releases/latest).
 2. Run it. **No administrator rights needed**: it installs for the current user only.
 3. If *"Windows protected your PC"* appears, click **More info → Run anyway** (the executable is not code-signed).
-4. To open images with AppImg on double-click: at the end of setup answer **Yes** and choose AppImg in *Settings → Default apps* (Windows does not let programs do it themselves). You can also do it later from menu **⋯ → Set as default image viewer**, or right-click an image → *Open with* → *Choose another app* → AppImg → *Always*.
+4. To open images with CorbolImg on double-click: at the end of setup answer **Yes** and choose CorbolImg in *Settings → Default apps* (Windows does not let programs do it themselves). You can also do it later from menu **⋯ → Set as default image viewer**, or right-click an image → *Open with* → *Choose another app* → CorbolImg → *Always*.
 
-Silent install (for IT): `AppImg-Setup-X.Y.Z.exe /silent` · Uninstall: Settings → Apps, or `"%LOCALAPPDATA%\Programs\AppImg\Uninstall.exe" /uninstall /silent`.
+Silent install (for IT): `CorbolImg-Setup-X.Y.Z.exe /silent` · Uninstall: Settings → Apps, or `"%LOCALAPPDATA%\Programs\CorbolImg\Uninstall.exe" /uninstall /silent`.
 
-From the **⋯** menu: language (English and Italian, following Windows; more languages can be added with a text file, see [lang/README.md](lang/README.md)), **updates** (*Check for updates* downloads the installer from Releases and verifies its SHA-256; the automatic daily check is off by default) and *About AppImg*.
+From the **⋯** menu: language (English and Italian, following Windows; more languages can be added with a text file, see [lang/README.md](lang/README.md)), **updates** (*Check for updates* downloads the installer from Releases and verifies its SHA-256; the automatic daily check is off by default) and *About CorbolImg*.
 
 ### Building from source
 Nothing to install: it uses the C# compiler that ships with Windows (.NET Framework 4.x).
 
 ```bat
-build.bat                      :: builds AppImg.exe
-build-installer.bat            :: builds dist\AppImg-Setup-X.Y.Z.exe
+build.bat                      :: builds CorbolImg.exe
+build-installer.bat            :: builds dist\CorbolImg-Setup-X.Y.Z.exe
 build-installer.bat patch      :: bumps the version (1.0.0 -> 1.0.1) and builds the installer
 ```
 
 ### Privacy
-AppImg collects no data and works only on your PC: images are never sent anywhere. The only connections are: the update check (`api.github.com`), when you ask for it or if you turn on the automatic one; the Real-ESRGAN download from GitHub, once and after you confirm; and, in the AI grid, the requests to the **assistant** you chose, which gets the text you write and, if you leave it on in the settings, the reduced chessboard (tile enhancement stays on your PC); the GPS location link opens OpenStreetMap only if you click it. Dictation (🎤) is Windows' own: AppImg does not access the microphone, speech recognition is handled by Windows according to its settings. Metadata (EXIF, GPS location...) is **not** copied to converted files.
+CorbolImg collects no data and works only on your PC: images are never sent anywhere. The only connections are: the update check (`api.github.com`), when you ask for it or if you turn on the automatic one; the Real-ESRGAN download from GitHub, once and after you confirm; and, in the AI grid, the requests to the **assistant** you chose, which gets the text you write and, if you leave it on in the settings, the reduced chessboard (tile enhancement stays on your PC); the GPS location link opens OpenStreetMap only if you click it. Dictation (🎤) is Windows' own: CorbolImg does not access the microphone, speech recognition is handled by Windows according to its settings. Metadata (EXIF, GPS location...) is **not** copied to converted files.
 
 **Translations are welcome**: adding a language is just a text file, no coding required — see [lang/README.md](lang/README.md).
 

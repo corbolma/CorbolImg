@@ -19,7 +19,7 @@ using Gdi = System.Drawing;
 using GdiImaging = System.Drawing.Imaging;
 using GdiD2 = System.Drawing.Drawing2D;
 
-namespace AppImg
+namespace CorbolImg
 {
     class OutputFormat
     {
@@ -719,7 +719,7 @@ namespace AppImg
             put("\nendstream\nendobj\n");
             string content = "q " + W + " 0 0 " + H + " 0 0 cm /Im0 Do Q\n";
             offsets.Add(pos); put("5 0 obj\n<< /Length " + content.Length + " >>\nstream\n" + content + "endstream\nendobj\n");
-            offsets.Add(pos); put("6 0 obj\n<< /Producer (AppImg " + AppVersion.Text + ") /CreationDate (D:" + DateTime.Now.ToString("yyyyMMddHHmmss", ci) + ") >>\nendobj\n");
+            offsets.Add(pos); put("6 0 obj\n<< /Producer (CorbolImg " + AppVersion.Text + ") /CreationDate (D:" + DateTime.Now.ToString("yyyyMMddHHmmss", ci) + ") >>\nendobj\n");
             long xref = pos;
             var sb = new StringBuilder();
             sb.Append("xref\n0 " + (offsets.Count + 1) + "\n0000000000 65535 f \n");

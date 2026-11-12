@@ -1,4 +1,4 @@
-// AppImg - convertitore: molte immagini insieme in un altro formato.
+// CorbolImg - convertitore: molte immagini insieme in un altro formato.
 // Compatibile con il compilatore csc di .NET Framework 4.x (C# 5).
 using System;
 using System.Collections.Generic;
@@ -8,7 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 
-namespace AppImg
+namespace CorbolImg
 {
     class Item
     {
@@ -332,7 +332,7 @@ namespace AppImg
         // Tutti i testi dell'interfaccia: richiamato anche quando si cambia lingua.
         public void ApplyTexts()
         {
-            Text = L.T("Converti immagini - AppImg", "Convert images - AppImg");
+            Text = L.T("Converti immagini - CorbolImg", "Convert images - CorbolImg");
             tAddFiles.Text = L.T("+ Immagini", "+ Images");
             tAddFolder.Text = L.T("+ Cartella", "+ Folder");
             tRemove.Text = L.T("Rimuovi", "Remove");
@@ -409,7 +409,7 @@ namespace AppImg
             loadingResize = false;
             SetResizeMode(mode == "long" ? ResizeMode.LongSide : mode == "box" ? ResizeMode.Box : mode == "percent" ? ResizeMode.Percent : ResizeMode.None);
             string dir = Settings.Get("outDir", "");
-            txtFolder.Text = dir.Length > 0 ? dir : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "AppImg");
+            txtFolder.Text = dir.Length > 0 ? dir : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "CorbolImg");
             rbFolder.Checked = Settings.Get("useOutDir", false);
             rbSame.Checked = !rbFolder.Checked;
             txtFolder.Enabled = btnBrowse.Enabled = rbFolder.Checked;
@@ -966,7 +966,7 @@ namespace AppImg
                 catch
                 {
                     MessageBox.Show(this, L.T("La cartella di destinazione non è valida o non si può creare.", "The destination folder is not valid or cannot be created."),
-                        "AppImg", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        "CorbolImg", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     txtFolder.Focus();
                     return;
                 }

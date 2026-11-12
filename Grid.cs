@@ -2,7 +2,7 @@
 // Ogni riquadro si può migliorare con Real-ESRGAN (ingrandimento x2/x3/x4 con ricostruzione dei dettagli),
 // salvare da solo, oppure "aprire" come nuova scacchiera da suddividere di nuovo, e così via in profondità.
 // L'assistente (Claude Code, Claude o un servizio compatibile OpenAI) riceve le richieste scritte
-// ("migliora F3 e salvalo", "zooma sulla targa") e risponde con le azioni che AppImg esegue.
+// ("migliora F3 e salvalo", "zooma sulla targa") e risponde con le azioni che CorbolImg esegue.
 // Compatibile con il compilatore csc di .NET Framework 4.x (C# 5).
 using System;
 using System.Collections.Generic;
@@ -16,7 +16,7 @@ using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 
-namespace AppImg
+namespace CorbolImg
 {
     class GridResult : IDisposable
     {
@@ -276,7 +276,7 @@ namespace AppImg
     class GridForm : Form
     {
         const string SystemPrompt =
-@"You control the AI grid of AppImg, a Windows image viewer. The user sees an image divided like a chessboard: columns are letters (A, B, C... left to right), rows are numbers (1, 2, 3... top to bottom); a cell is named column+row, so A1 is the top-left cell. Each cell can be enhanced on the user's PC with Real-ESRGAN (AI super-resolution: it enlarges x2, x3 or x4 and reconstructs detail), saved on its own, or entered: entering a cell makes it the new board (its enhanced version if it has one), which can be divided again, so the user can zoom deeper and deeper.
+@"You control the AI grid of CorbolImg, a Windows image viewer. The user sees an image divided like a chessboard: columns are letters (A, B, C... left to right), rows are numbers (1, 2, 3... top to bottom); a cell is named column+row, so A1 is the top-left cell. Each cell can be enhanced on the user's PC with Real-ESRGAN (AI super-resolution: it enlarges x2, x3 or x4 and reconstructs detail), saved on its own, or entered: entering a cell makes it the new board (its enhanced version if it has one), which can be divided again, so the user can zoom deeper and deeper.
 
 Reply ONLY with one JSON object and nothing else:
 {""say"": ""short message for the user, in the user's language"", ""actions"": [ ... ]}
@@ -460,7 +460,7 @@ Rules: cell names always refer to the current board at that point of the sequenc
         }
 
         // Dettatura: si mette il cursore in fondo alla richiesta e si apre la dettatura vocale di Windows (Win+H),
-        // che scrive nella casella che ha il fuoco. Riconoscimento di Windows: AppImg non tocca il microfono.
+        // che scrive nella casella che ha il fuoco. Riconoscimento di Windows: CorbolImg non tocca il microfono.
         [System.Runtime.InteropServices.DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, int flags, IntPtr extra);
 
         void Dictate()
@@ -504,7 +504,7 @@ Rules: cell names always refer to the current board at that point of the sequenc
 
         public void ApplyTexts()
         {
-            Text = L.T("Griglia IA", "AI grid") + " - " + Path.GetFileName(sourcePath) + " - AppImg";
+            Text = L.T("Griglia IA", "AI grid") + " - " + Path.GetFileName(sourcePath) + " - CorbolImg";
             bBack.Text = L.T("Indietro", "Back");
             bBack.ToolTipText = L.T("Torna alla scacchiera precedente (Backspace)", "Back to the previous grid (Backspace)");
             bTop.Text = L.T("Immagine intera", "Whole image");
@@ -671,7 +671,7 @@ Rules: cell names always refer to the current board at that point of the sequenc
             if (ask && board.Done.Count > 0 &&
                 MessageBox.Show(this, L.F("Cambiando la griglia si perdono i riquadri migliorati di questa scacchiera ({0}). Continuare?",
                                           "Changing the grid discards the enhanced tiles of this grid ({0}). Continue?", board.Done.Count),
-                                "AppImg", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                                "CorbolImg", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
             {
                 UpdateUi();
                 return false;
@@ -715,7 +715,7 @@ Rules: cell names always refer to the current board at that point of the sequenc
                 L.F("Per migliorare i riquadri serve Real-ESRGAN (gratuito, licenza BSD-3-Clause): lavora sul PC con la scheda video, le immagini non escono dal computer.\n\nScaricarlo ora da GitHub? ({0}, una sola volta)",
                     "Enhancing tiles needs Real-ESRGAN (free, BSD-3-Clause license): it runs on this PC using the graphics card, images never leave the computer.\n\nDownload it now from GitHub? ({0}, only once)",
                     Util.FormatBytes(Esrgan.DownloadBytes)),
-                "AppImg", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                "CorbolImg", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (r != DialogResult.Yes) { then(false); return; }
             working = true;
             var token = cts.Token;
@@ -729,7 +729,7 @@ Rules: cell names always refer to the current board at that point of the sequenc
                     working = false;
                     SetStatus(err == null ? L.T("Real-ESRGAN installato.", "Real-ESRGAN installed.") : "");
                     UpdateUi();
-                    if (err != null) MessageBox.Show(this, L.T("Download non riuscito:", "Download failed:") + "\n" + err, "AppImg", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    if (err != null) MessageBox.Show(this, L.T("Download non riuscito:", "Download failed:") + "\n" + err, "CorbolImg", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     then(err == null);
                 });
             });
@@ -786,7 +786,7 @@ Rules: cell names always refer to the current board at that point of the sequenc
                         if (err != null && !token.IsCancellationRequested)
                         {
                             if (aiRunning) Log(err, CError);
-                            else MessageBox.Show(this, err, "AppImg", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            else MessageBox.Show(this, err, "CorbolImg", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         }
                         done(false);
                     });
@@ -857,7 +857,7 @@ Rules: cell names always refer to the current board at that point of the sequenc
         {
             try
             {
-                string t = Path.Combine(dir, ".appimg-" + Guid.NewGuid().ToString("N").Substring(0, 6));
+                string t = Path.Combine(dir, ".corbolimg-" + Guid.NewGuid().ToString("N").Substring(0, 6));
                 File.WriteAllText(t, "");
                 File.Delete(t);
                 return true;
@@ -893,7 +893,7 @@ Rules: cell names always refer to the current board at that point of the sequenc
                         SetStatus("");
                         results.Add("save: failed (" + err + ")");
                         if (aiRunning) Log(L.T("Salvataggio non riuscito:", "Saving failed:") + " " + err, CError);
-                        else MessageBox.Show(this, L.T("Salvataggio non riuscito:", "Saving failed:") + "\n" + err, "AppImg", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        else MessageBox.Show(this, L.T("Salvataggio non riuscito:", "Saving failed:") + "\n" + err, "CorbolImg", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
                     if (done != null) done(err == null);
                 });
@@ -912,7 +912,7 @@ Rules: cell names always refer to the current board at that point of the sequenc
             var provider = AiSettings.Create(out missing);
             if (provider == null)
             {
-                MessageBox.Show(this, missing, "AppImg", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(this, missing, "CorbolImg", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 ShowAiSettings();
                 return;
             }

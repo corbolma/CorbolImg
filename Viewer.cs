@@ -1,4 +1,4 @@
-// AppImg - visualizzatore: apre un'immagine e scorre le altre della stessa cartella,
+// CorbolImg - visualizzatore: apre un'immagine e scorre le altre della stessa cartella,
 // con zoom, rotazione, schermo intero, presentazione, informazioni EXIF, Salva come e convertitore.
 // Compatibile con il compilatore csc di .NET Framework 4.x (C# 5).
 using System;
@@ -13,7 +13,7 @@ using System.Linq;
 using System.Windows.Forms;
 using Microsoft.VisualBasic.FileIO;
 
-namespace AppImg
+namespace CorbolImg
 {
     // Icone della barra: glifi del font di sistema di Windows 10/11 (Segoe Fluent Icons / Segoe MDL2 Assets).
     static class Glyphs
@@ -793,7 +793,7 @@ namespace AppImg
             bFull.ToolTipText = L.T("Schermo intero (F11)", "Full screen (F11)");
             bMore.ToolTipText = L.T("Altro", "More");
 
-            if (Updater.Version != null) mUpdAvail.Text = L.F("Aggiorna ad AppImg {0}...", "Update to AppImg {0}...", Updater.Version);
+            if (Updater.Version != null) mUpdAvail.Text = L.F("Aggiorna a CorbolImg {0}...", "Update to CorbolImg {0}...", Updater.Version);
             mFolder.Text = L.T("Mostra in Esplora file", "Show in File Explorer");
             mCopy.Text = L.T("Copia", "Copy");
             mSlideshow.Text = L.T("Presentazione", "Slideshow");
@@ -803,7 +803,7 @@ namespace AppImg
             mCheckUpd.Text = L.T("Controlla aggiornamenti", "Check for updates");
             mAutoUpd.Text = L.T("Controlla automaticamente (una volta al giorno)", "Check automatically (once a day)");
             mSite.Text = L.T("Pagina del progetto (GitHub)", "Project page (GitHub)");
-            mAbout.Text = L.T("Informazioni su AppImg", "About AppImg");
+            mAbout.Text = L.T("Informazioni su CorbolImg", "About CorbolImg");
 
             cSave.Text = L.T("Salva come...", "Save as...");
             cConvert.Text = L.T("Converti...", "Convert...");
@@ -841,9 +841,9 @@ namespace AppImg
         void OnUpdateAvailable()
         {
             if (Updater.Version == null) return;
-            mUpdAvail.Text = L.F("Aggiorna ad AppImg {0}...", "Update to AppImg {0}...", Updater.Version);
+            mUpdAvail.Text = L.F("Aggiorna a CorbolImg {0}...", "Update to CorbolImg {0}...", Updater.Version);
             mUpdAvail.Visible = true;
-            ShowFlash(L.F("È disponibile AppImg {0}: menu ⋯ → Aggiorna.", "AppImg {0} is available: menu ⋯ → Update.", Updater.Version));
+            ShowFlash(L.F("È disponibile CorbolImg {0}: menu ⋯ → Aggiorna.", "CorbolImg {0} is available: menu ⋯ → Update.", Updater.Version));
         }
 
         // ===================== Apertura e navigazione =====================
@@ -956,7 +956,7 @@ namespace AppImg
                 canvas.Message = folder != null ? L.T("Nessuna immagine in questa cartella.", "No images in this folder.")
                                                 : L.T("Apri un'immagine (Ctrl+O) o trascinala qui", "Open an image (Ctrl+O) or drag it here");
                 canvas.Invalidate();
-                Text = "AppImg";
+                Text = "CorbolImg";
                 cache.Want(new List<string>());
                 UpdateUi();
                 return;
@@ -976,7 +976,7 @@ namespace AppImg
                                              : L.T("Caricamento...", "Loading...");
                 canvas.Invalidate();
             }
-            Text = Path.GetFileName(p) + " - AppImg";
+            Text = Path.GetFileName(p) + " - CorbolImg";
 
             // In memoria: questa, la successiva, la precedente e quella dopo ancora
             var order = new List<string> { p };
@@ -1183,7 +1183,7 @@ namespace AppImg
         {
             string p = Current;
             if (p == null) return;
-            if (MessageBox.Show(this, L.F("Spostare «{0}» nel Cestino?", "Move \"{0}\" to the Recycle Bin?", Path.GetFileName(p)), "AppImg",
+            if (MessageBox.Show(this, L.F("Spostare «{0}» nel Cestino?", "Move \"{0}\" to the Recycle Bin?", Path.GetFileName(p)), "CorbolImg",
                     MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1) != DialogResult.Yes) return;
             canvas.SetImage(null, false, false);
             cache.Remove(p);
@@ -1191,7 +1191,7 @@ namespace AppImg
             catch (OperationCanceledException) { ShowCurrent(); return; }
             catch (Exception ex)
             {
-                MessageBox.Show(this, L.T("Impossibile eliminare il file:", "Cannot delete the file:") + "\n" + ex.Message, "AppImg", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, L.T("Impossibile eliminare il file:", "Cannot delete the file:") + "\n" + ex.Message, "CorbolImg", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 ShowCurrent();
                 return;
             }
@@ -1291,7 +1291,7 @@ namespace AppImg
             {
                 flash = null;
                 UpdateStatus();
-                MessageBox.Show(this, L.T("Salvataggio non riuscito:", "Saving failed:") + "\n" + err, "AppImg", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, L.T("Salvataggio non riuscito:", "Saving failed:") + "\n" + err, "CorbolImg", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
             long len = 0;
@@ -1320,10 +1320,10 @@ namespace AppImg
         // Windows non permette di cambiare l'app predefinita da programma: si apre la pagina delle Impostazioni.
         void SetAsDefault()
         {
-            MessageBox.Show(this, L.T("Si aprirà Impostazioni → App predefinite.\n\nScegli AppImg e impostalo per i tipi di immagine che vuoi aprire con un doppio clic (JPG, PNG, HEIC...).\n\nIn alternativa: tasto destro su un'immagine → Apri con → Scegli un'altra app → AppImg → Sempre.",
-                                      "Settings → Default apps will open.\n\nChoose AppImg and set it for the image types you want to open with a double-click (JPG, PNG, HEIC...).\n\nAlternatively: right-click an image → Open with → Choose another app → AppImg → Always."),
-                "AppImg", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            try { System.Diagnostics.Process.Start("ms-settings:defaultapps?registeredAppUser=AppImg"); }
+            MessageBox.Show(this, L.T("Si aprirà Impostazioni → App predefinite.\n\nScegli CorbolImg e impostalo per i tipi di immagine che vuoi aprire con un doppio clic (JPG, PNG, HEIC...).\n\nIn alternativa: tasto destro su un'immagine → Apri con → Scegli un'altra app → CorbolImg → Sempre.",
+                                      "Settings → Default apps will open.\n\nChoose CorbolImg and set it for the image types you want to open with a double-click (JPG, PNG, HEIC...).\n\nAlternatively: right-click an image → Open with → Choose another app → CorbolImg → Always."),
+                "CorbolImg", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            try { System.Diagnostics.Process.Start("ms-settings:defaultapps?registeredAppUser=CorbolImg"); }
             catch { Util.OpenUrl("ms-settings:defaultapps"); }
         }
 

@@ -1,4 +1,4 @@
-# Genera appimg.ico (multi-risoluzione, PNG interni) e un'anteprima icon-preview.png
+# Genera corbolimg.ico (multi-risoluzione, PNG interni) e un'anteprima icon-preview.png
 Add-Type -AssemblyName System.Drawing
 $ErrorActionPreference = 'Stop'
 $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -84,7 +84,7 @@ for ($i = 0; $i -lt $sizes.Count; $i++) {
 }
 foreach ($d in $pngs) { $bw.Write($d) }
 $bw.Flush()
-[System.IO.File]::WriteAllBytes((Join-Path $dir 'appimg.ico'), $out.ToArray())
+[System.IO.File]::WriteAllBytes((Join-Path $dir 'corbolimg.ico'), $out.ToArray())
 
 # Anteprima: tutte le dimensioni affiancate su sfondo chiaro e scuro
 $pw = 20; foreach ($s in $sizes) { $pw += $s + 20 }
@@ -99,4 +99,4 @@ foreach ($s in $sizes) {
     $x += $s + 20; $b.Dispose()
 }
 $prev.Save((Join-Path $dir 'icon-preview.png'), [System.Drawing.Imaging.ImageFormat]::Png)
-Write-Output "Creati appimg.ico e icon-preview.png"
+Write-Output "Creati corbolimg.ico e icon-preview.png"

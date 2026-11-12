@@ -1,10 +1,10 @@
 // Assistente della Griglia IA: un modello linguistico che "pilota" Real-ESRGAN.
 // L'utente scrive cosa vuole ("migliora F3 e salvalo", "dividi D2 in 4x4"), il modello guarda la scacchiera
-// (immagine ridotta con la griglia e le etichette) e risponde con un JSON di azioni che AppImg esegue.
+// (immagine ridotta con la griglia e le etichette) e risponde con un JSON di azioni che CorbolImg esegue.
 //   - Claude Code: il programma installato sul PC, con l'abbonamento dell'utente (niente chiave API).
 //   - Claude: API Anthropic (POST /v1/messages), con la chiave dell'utente.
 //   - Compatibile OpenAI: POST <url>/chat/completions (OpenAI, OpenRouter, Ollama, LM Studio...), modello con visione.
-// Stesso schema di AppPad e AppIP. Niente SDK: HTTP e JSON a mano, con JavaScriptSerializer.
+// Stesso schema di CorbolPad e CorbolIp. Niente SDK: HTTP e JSON a mano, con JavaScriptSerializer.
 // Compatibile con il compilatore csc di .NET Framework 4.x (C# 5).
 using System;
 using System.Collections;
@@ -21,7 +21,7 @@ using System.Threading;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
 
-namespace AppImg
+namespace CorbolImg
 {
     class AiMessage
     {
@@ -134,7 +134,7 @@ namespace AppImg
                     req = (HttpWebRequest)WebRequest.Create(Url);
                     req.Method = "POST";
                     req.ContentType = "application/json";
-                    req.UserAgent = "AppImg/" + AppVersion.Text;
+                    req.UserAgent = "CorbolImg/" + AppVersion.Text;
                     req.Timeout = req.ReadWriteTimeout = 300000;
                     req.ServicePoint.Expect100Continue = false;
                     AddHeaders(req);
@@ -307,7 +307,7 @@ namespace AppImg
         }
     }
 
-    // Claude Code installato sul PC, con l'abbonamento dell'utente. AppImg avvia "claude -p" senza strumenti
+    // Claude Code installato sul PC, con l'abbonamento dell'utente. CorbolImg avvia "claude -p" senza strumenti
     // (non legge file né esegue comandi), senza server MCP e senza salvare la sessione, in una cartella vuota;
     // la conversazione e l'immagine arrivano su stdin in formato stream-json.
     class ClaudeCodeProvider : IAiProvider
@@ -372,7 +372,7 @@ namespace AppImg
                 res.Error = L.T("Claude Code non è installato su questo PC (comando claude non trovato).", "Claude Code is not installed on this PC (claude command not found).");
                 return res;
             }
-            string dir = Path.Combine(Path.GetTempPath(), "AppImg-claudecode");
+            string dir = Path.Combine(Path.GetTempPath(), "CorbolImg-claudecode");
             string sysFile = Path.Combine(dir, "system-" + Guid.NewGuid().ToString("N") + ".txt");
             var err = new StringBuilder();
             Process p = null;
@@ -395,7 +395,7 @@ namespace AppImg
                     StandardOutputEncoding = Encoding.UTF8,
                     StandardErrorEncoding = Encoding.UTF8
                 };
-                // se AppImg è stato avviato da una sessione di Claude Code, quella nuova deve essere indipendente
+                // se CorbolImg è stato avviato da una sessione di Claude Code, quella nuova deve essere indipendente
                 psi.EnvironmentVariables.Remove("CLAUDECODE");
                 psi.EnvironmentVariables.Remove("CLAUDE_CODE_ENTRYPOINT");
                 p = Process.Start(psi);
@@ -458,6 +458,7 @@ namespace AppImg
     // Chiavi API in settings.txt cifrate con DPAPI: le legge solo lo stesso utente Windows sullo stesso PC
     static class Secret
     {
+        // Non cambia con il nome dell'app (prima AppImg): con questa sono cifrate le chiavi già salvate
         static readonly byte[] Entropy = Encoding.UTF8.GetBytes("AppImg.ai.v1");
 
         public static string Protect(string plain)

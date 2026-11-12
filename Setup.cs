@@ -1,7 +1,7 @@
-// Installer di AppImg: un solo exe che contiene AppImg.exe.
-// Installa per l'utente corrente (nessun permesso di amministratore) in %LOCALAPPDATA%\Programs\AppImg.
-//   AppImg-Setup.exe              -> finestra di installazione / aggiornamento
-//   AppImg-Setup.exe /silent      -> installazione silenziosa (menu Start, "Invia a", "Apri con")
+// Installer di CorbolImg: un solo exe che contiene CorbolImg.exe.
+// Installa per l'utente corrente (nessun permesso di amministratore) in %LOCALAPPDATA%\Programs\CorbolImg.
+//   CorbolImg-Setup.exe              -> finestra di installazione / aggiornamento
+//   CorbolImg-Setup.exe /silent      -> installazione silenziosa (menu Start, "Invia a", "Apri con")
 //   Uninstall.exe /uninstall      -> disinstallazione (registrata in Impostazioni > App)
 using System;
 using System.Diagnostics;
@@ -14,9 +14,9 @@ using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: AssemblyTitle("Installazione AppImg")]
+[assembly: AssemblyTitle("Installazione CorbolImg")]
 
-namespace AppImg.Setup
+namespace CorbolImg.Setup
 {
     static class Program
     {
@@ -44,7 +44,7 @@ namespace AppImg.Setup
             }
             catch (Exception ex)
             {
-                if (!silent) MessageBox.Show(L.T("Errore", "Error") + ": " + ex.Message, "AppImg", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                if (!silent) MessageBox.Show(L.T("Errore", "Error") + ": " + ex.Message, "CorbolImg", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return 2;
             }
         }
@@ -52,22 +52,22 @@ namespace AppImg.Setup
 
     static class Installer
     {
-        const string UninstKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\AppImg";
+        const string UninstKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\CorbolImg";
 
         public static readonly string InstallDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "AppImg");
-        public static readonly string ExePath = Path.Combine(InstallDir, "AppImg.exe");
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "CorbolImg");
+        public static readonly string ExePath = Path.Combine(InstallDir, "CorbolImg.exe");
         public static readonly string UninstallerPath = Path.Combine(InstallDir, "Uninstall.exe");
-        static readonly string StartMenuLnk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "AppImg.lnk");
-        static readonly string DesktopLnk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "AppImg.lnk");
-        static readonly string SendToLnk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.SendTo), "AppImg.lnk");
+        static readonly string StartMenuLnk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "CorbolImg.lnk");
+        static readonly string DesktopLnk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "CorbolImg.lnk");
+        static readonly string SendToLnk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.SendTo), "CorbolImg.lnk");
 
         public static readonly Version Current = Version.Parse(AppVersion.Text);
 
         // Versione realmente installata: letta dall'exe (non solo dal registro), null se non installata.
         public static Version InstalledVersion()
         {
-            if (!File.Exists(ExePath)) return null;
+            if (!File.Exists(ExePath)) return OldApp.InstalledVersion(); // installata col nome vecchio, o null
             try
             {
                 var fv = FileVersionInfo.GetVersionInfo(ExePath);
@@ -85,20 +85,27 @@ namespace AppImg.Setup
 
         public static string V(Version v) { return v.Major + "." + v.Minor + "." + Math.Max(0, v.Build); }
 
-        public static bool DesktopShortcutExists() { return File.Exists(DesktopLnk); }
+        public static bool DesktopShortcutExists() { return File.Exists(DesktopLnk) || (!File.Exists(ExePath) && File.Exists(OldApp.DesktopLnk)); }
         // "Invia a" attivo di default; in un aggiornamento si mantiene la scelta fatta
-        public static bool SendToEnabled() { return InstalledVersion() == null || File.Exists(SendToLnk); }
+        public static bool SendToEnabled()
+        {
+            if (!File.Exists(ExePath) && OldApp.Installed) return File.Exists(OldApp.SendToLnk); // aggiornamento dal nome vecchio
+            return InstalledVersion() == null || File.Exists(SendToLnk);
+        }
         // Registrazione come visualizzatore ("Apri con", App predefinite): attiva di default, in un aggiornamento si mantiene
         public static bool AssociationsEnabled()
         {
             using (var k = Registry.CurrentUser.OpenSubKey(UninstKey))
-                return k == null || !(k.GetValue("OpenWith") is int) || (int)k.GetValue("OpenWith") != 0;
+            {
+                if (k == null) { var old = OldApp.Choice("OpenWith"); return old == null || old.Value != 0; } // anche dal nome vecchio
+                return !(k.GetValue("OpenWith") is int) || (int)k.GetValue("OpenWith") != 0;
+            }
         }
 
         // ---------- associazione ai tipi di immagine (solo per l'utente corrente) ----------
         const string ClassesKey = @"Software\Classes";
-        const string ProgId = "AppImg.Image";
-        const string CapabilitiesKey = @"Software\AppImg\Capabilities";
+        const string ProgId = "AppImg.Image"; // come prima del cambio di nome: resta valida l'app predefinita scelta dall'utente
+        const string CapabilitiesKey = @"Software\CorbolImg\Capabilities";
         static readonly string[] ImageExts =
         {
             ".jpg", ".jpeg", ".jpe", ".jfif", ".png", ".gif", ".bmp", ".dib", ".tif", ".tiff", ".ico", ".webp", ".heic", ".heif",
@@ -108,7 +115,7 @@ namespace AppImg.Setup
 
         [DllImport("shell32.dll")] static extern void SHChangeNotify(int eventId, int flags, IntPtr item1, IntPtr item2);
 
-        // AppImg compare in "Apri con" e in Impostazioni > App predefinite. L'app predefinita la sceglie l'utente:
+        // CorbolImg compare in "Apri con" e in Impostazioni > App predefinite. L'app predefinita la sceglie l'utente:
         // Windows non permette ai programmi di impostarla da soli.
         static void RegisterAssociations()
         {
@@ -120,9 +127,9 @@ namespace AppImg.Setup
                 using (var i = k.CreateSubKey("DefaultIcon")) i.SetValue("", "\"" + ExePath + "\",0");
                 using (var c = k.CreateSubKey(@"shell\open\command")) c.SetValue("", open);
             }
-            using (var k = Registry.CurrentUser.CreateSubKey(ClassesKey + @"\Applications\AppImg.exe"))
+            using (var k = Registry.CurrentUser.CreateSubKey(ClassesKey + @"\Applications\CorbolImg.exe"))
             {
-                k.SetValue("FriendlyAppName", "AppImg");
+                k.SetValue("FriendlyAppName", "CorbolImg");
                 using (var c = k.CreateSubKey(@"shell\open\command")) c.SetValue("", open);
                 using (var t = k.CreateSubKey("SupportedTypes")) foreach (var e in ImageExts) t.SetValue(e, "");
             }
@@ -131,31 +138,32 @@ namespace AppImg.Setup
                     k.SetValue(ProgId, new byte[0], RegistryValueKind.None);
             using (var k = Registry.CurrentUser.CreateSubKey(CapabilitiesKey))
             {
-                k.SetValue("ApplicationName", "AppImg");
+                k.SetValue("ApplicationName", "CorbolImg");
                 k.SetValue("ApplicationDescription", L.T("Visualizzatore di immagini con convertitore", "Image viewer and converter"));
                 k.SetValue("ApplicationIcon", "\"" + ExePath + "\",0");
                 using (var f = k.CreateSubKey("FileAssociations")) foreach (var e in ImageExts) f.SetValue(e, ProgId);
             }
-            using (var k = Registry.CurrentUser.CreateSubKey(@"Software\RegisteredApplications")) k.SetValue("AppImg", CapabilitiesKey);
+            using (var k = Registry.CurrentUser.CreateSubKey(@"Software\RegisteredApplications")) k.SetValue("CorbolImg", CapabilitiesKey);
             SHChangeNotify(0x08000000, 0, IntPtr.Zero, IntPtr.Zero); // SHCNE_ASSOCCHANGED
         }
 
         static void UnregisterAssociations()
         {
             try { Registry.CurrentUser.DeleteSubKeyTree(ClassesKey + "\\" + ProgId, false); } catch { }
-            try { Registry.CurrentUser.DeleteSubKeyTree(ClassesKey + @"\Applications\AppImg.exe", false); } catch { }
-            try { Registry.CurrentUser.DeleteSubKeyTree(@"Software\AppImg", false); } catch { }
-            try { using (var k = Registry.CurrentUser.OpenSubKey(@"Software\RegisteredApplications", true)) if (k != null) k.DeleteValue("AppImg", false); } catch { }
+            try { Registry.CurrentUser.DeleteSubKeyTree(ClassesKey + @"\Applications\CorbolImg.exe", false); } catch { }
+            try { Registry.CurrentUser.DeleteSubKeyTree(@"Software\CorbolImg", false); } catch { }
+            try { using (var k = Registry.CurrentUser.OpenSubKey(@"Software\RegisteredApplications", true)) if (k != null) k.DeleteValue("CorbolImg", false); } catch { }
             foreach (var e in ImageExts)
                 try { using (var k = Registry.CurrentUser.OpenSubKey(ClassesKey + "\\" + e + @"\OpenWithProgids", true)) if (k != null) k.DeleteValue(ProgId, false); } catch { }
             SHChangeNotify(0x08000000, 0, IntPtr.Zero, IntPtr.Zero);
         }
 
-        // Chiude AppImg se è aperta: prima con garbo (chiusura della finestra), poi forzando.
+        // Chiude CorbolImg se è aperta: prima con garbo (chiusura della finestra), poi forzando.
         public static void CloseRunning()
         {
+            OldApp.CloseRunning(null); // la versione col nome vecchio
             int session = Process.GetCurrentProcess().SessionId;
-            Func<Process[]> mine = () => Process.GetProcessesByName("AppImg").Where(p => p.SessionId == session).ToArray();
+            Func<Process[]> mine = () => Process.GetProcessesByName("CorbolImg").Where(p => p.SessionId == session).ToArray();
             if (mine().Length == 0) return;
             foreach (var p in mine())
                 try { p.CloseMainWindow(); } catch { }
@@ -168,11 +176,16 @@ namespace AppImg.Setup
         public static void Install(bool desktop, bool sendTo, bool associate, bool launch)
         {
             CloseRunning();
+            // Dal nome vecchio: dati nelle cartelle nuove, vecchia installazione tolta (le scelte sono già state lette)
+            OldApp.MoveData();
+            OldApp.RemoveInstall();
+            try { Registry.CurrentUser.DeleteSubKeyTree(@"Software\" + OldApp.Name, false); } catch { }
+            try { using (var k = Registry.CurrentUser.OpenSubKey(@"Software\RegisteredApplications", true)) if (k != null) k.DeleteValue(OldApp.Name, false); } catch { }
             Directory.CreateDirectory(InstallDir);
 
-            using (var src = Assembly.GetExecutingAssembly().GetManifestResourceStream("AppImg.payload"))
+            using (var src = Assembly.GetExecutingAssembly().GetManifestResourceStream("CorbolImg.payload"))
             {
-                if (src == null) throw new InvalidOperationException("pacchetto AppImg.exe mancante nell'installer");
+                if (src == null) throw new InvalidOperationException("pacchetto CorbolImg.exe mancante nell'installer");
                 string tmp = ExePath + ".new";
                 using (var dst = File.Create(tmp)) src.CopyTo(dst);
                 if (File.Exists(ExePath)) File.Delete(ExePath);
@@ -187,15 +200,15 @@ namespace AppImg.Setup
             CreateShortcut(StartMenuLnk, ExePath, "", desc);
             if (desktop) CreateShortcut(DesktopLnk, ExePath, "", desc);
             else if (File.Exists(DesktopLnk)) File.Delete(DesktopLnk);
-            // "Invia a > AppImg" apre direttamente il convertitore con i file selezionati
-            if (sendTo) CreateShortcut(SendToLnk, ExePath, "/convert", L.T("Converti le immagini selezionate con AppImg", "Convert the selected images with AppImg"));
+            // "Invia a > CorbolImg" apre direttamente il convertitore con i file selezionati
+            if (sendTo) CreateShortcut(SendToLnk, ExePath, "/convert", L.T("Converti le immagini selezionate con CorbolImg", "Convert the selected images with CorbolImg"));
             else if (File.Exists(SendToLnk)) File.Delete(SendToLnk);
             if (associate) RegisterAssociations();
             else UnregisterAssociations();
 
             using (var k = Registry.CurrentUser.CreateSubKey(UninstKey))
             {
-                k.SetValue("DisplayName", "AppImg");
+                k.SetValue("DisplayName", "CorbolImg");
                 k.SetValue("DisplayVersion", AppVersion.Text);
                 k.SetValue("VersionMajor", Current.Major, RegistryValueKind.DWord);
                 k.SetValue("VersionMinor", Current.Minor, RegistryValueKind.DWord);
@@ -212,12 +225,14 @@ namespace AppImg.Setup
                 k.SetValue("OpenWith", associate ? 1 : 0, RegistryValueKind.DWord); // scelta ricordata negli aggiornamenti
             }
 
+            UpdateOldAppKey(ImageExts);
+            RetargetPins();
             if (launch) Process.Start(new ProcessStartInfo(ExePath) { WorkingDirectory = InstallDir });
         }
 
         public static bool Uninstall(bool silent)
         {
-            if (!silent && MessageBox.Show(L.T("Vuoi disinstallare AppImg?", "Do you want to uninstall AppImg?"), L.T("Disinstalla AppImg", "Uninstall AppImg"),
+            if (!silent && MessageBox.Show(L.T("Vuoi disinstallare CorbolImg?", "Do you want to uninstall CorbolImg?"), L.T("Disinstalla CorbolImg", "Uninstall CorbolImg"),
                     MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                 return false;
 
@@ -228,14 +243,14 @@ namespace AppImg.Setup
             UnregisterAssociations();
             try
             {
-                string settings = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AppImg");
+                string settings = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CorbolImg");
                 if (Directory.Exists(settings)) Directory.Delete(settings, true);
             }
             catch { }
             try
             {
                 // Real-ESRGAN scaricato dalla Griglia IA
-                string engine = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AppImg");
+                string engine = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CorbolImg");
                 if (Directory.Exists(engine)) Directory.Delete(engine, true);
             }
             catch { }
@@ -251,12 +266,73 @@ namespace AppImg.Setup
                 WorkingDirectory = Path.GetTempPath()
             });
 
-            if (!silent) MessageBox.Show(L.T("AppImg è stata disinstallata.", "AppImg has been uninstalled."), L.T("Disinstalla AppImg", "Uninstall AppImg"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (!silent) MessageBox.Show(L.T("CorbolImg è stata disinstallata.", "CorbolImg has been uninstalled."), L.T("Disinstalla CorbolImg", "Uninstall CorbolImg"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             return true;
         }
 
-        // Deve coincidere con Program.AppUserModelId in AppImg.cs
-        const string AppUserModelId = "AppImg.Viewer";
+        // "Apri con" col nome vecchio: se è l'app predefinita scelta dall'utente per qualche tipo di file
+        // (Apri con > Usa sempre questa app), la voce resta e apre il nuovo exe, altrimenti si toglie
+        static void UpdateOldAppKey(string[] exts)
+        {
+            string key = @"Software\Classes\Applications\" + OldApp.Name + ".exe";
+            string id = @"Applications\" + OldApp.Name + ".exe";
+            bool chosen = false;
+            foreach (var e in exts)
+                try
+                {
+                    using (var k = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\" + e + @"\UserChoice"))
+                        if (k != null && string.Equals(k.GetValue("ProgId") as string, id, StringComparison.OrdinalIgnoreCase)) chosen = true;
+                }
+                catch { }
+            if (!chosen)
+            {
+                try { Registry.CurrentUser.DeleteSubKeyTree(key, false); } catch { }
+                return;
+            }
+            try
+            {
+                using (var k = Registry.CurrentUser.CreateSubKey(key))
+                {
+                    k.SetValue("FriendlyAppName", "CorbolImg");
+                    try { k.DeleteSubKeyTree("SupportedTypes", false); } catch { } // niente doppioni in "Apri con"
+                    using (var c = k.CreateSubKey(@"shell\open\command")) c.SetValue("", "\"" + ExePath + "\" \"%1\"");
+                }
+            }
+            catch { }
+        }
+
+        // Icone fissate alla barra delle applicazioni che aprono l'exe col nome vecchio: ora aprono quello nuovo
+        // (stesso AppUserModelID, quindi l'icona fissata resta quella della finestra aperta)
+        static void RetargetPins()
+        {
+            string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                @"Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar");
+            if (!Directory.Exists(dir)) return;
+            foreach (var lnk in Directory.GetFiles(dir, "*.lnk"))
+            {
+                IShellLinkW link = null;
+                try
+                {
+                    link = (IShellLinkW)new CShellLink();
+                    var pf = (System.Runtime.InteropServices.ComTypes.IPersistFile)link;
+                    pf.Load(lnk, 2 /* STGM_READWRITE */);
+                    var sb = new System.Text.StringBuilder(1024);
+                    link.GetPath(sb, sb.Capacity, IntPtr.Zero, 0);
+                    if (string.Equals(sb.ToString(), OldApp.ExePath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        link.SetPath(ExePath);
+                        link.SetWorkingDirectory(InstallDir);
+                        link.SetIconLocation(ExePath, 0);
+                        pf.Save(lnk, true);
+                    }
+                }
+                catch { }
+                finally { if (link != null) Marshal.FinalReleaseComObject(link); }
+            }
+        }
+
+        // Deve coincidere con Program.AppUserModelId in CorbolImg.cs
+        const string AppUserModelId = "AppImg.Viewer"; // come prima del cambio di nome: le icone già fissate alla barra restano della stessa app
 
         // Crea il collegamento con l'AppUserModelID, così l'icona fissata alla barra corrisponde alla finestra aperta.
         static void CreateShortcut(string lnkPath, string target, string args, string description)
@@ -342,11 +418,17 @@ namespace AppImg.Setup
             string vi = installed != null ? Installer.V(installed) : null, vc = Installer.V(cur);
             string infoText, action;
             bool warn = false;
-            if (installed == null)
+            if (installed != null && !File.Exists(Installer.ExePath))
+            {
+                action = L.T("Aggiorna", "Update");
+                infoText = L.F("{0} {1} diventa CorbolImg {2}: cambia solo il nome, le impostazioni vengono mantenute.",
+                               "{0} {1} becomes CorbolImg {2}: only the name changes, your settings are kept.", OldApp.Name, vi, vc);
+            }
+            else if (installed == null)
             {
                 action = L.T("Installa", "Install");
-                infoText = L.T("AppImg verrà installata solo per il tuo utente, senza permessi di amministratore, nella cartella:",
-                               "AppImg will be installed for your user only, without administrator rights, in the folder:");
+                infoText = L.T("CorbolImg verrà installata solo per il tuo utente, senza permessi di amministratore, nella cartella:",
+                               "CorbolImg will be installed for your user only, without administrator rights, in the folder:");
             }
             else if (installed < cur)
             {
@@ -369,7 +451,7 @@ namespace AppImg.Setup
             }
 
             var accent = Color.FromArgb(124, 58, 237);
-            Text = action + " AppImg";
+            Text = action + " CorbolImg";
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = MinimizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
@@ -385,7 +467,7 @@ namespace AppImg.Setup
             try { using (var ic = new Icon(Icon, 64, 64)) pic.Image = ic.ToBitmap(); } catch { }
             var title = new Label
             {
-                Text = "AppImg " + AppVersion.Text, ForeColor = Color.White, AutoSize = true,
+                Text = "CorbolImg " + AppVersion.Text, ForeColor = Color.White, AutoSize = true,
                 Font = new Font("Segoe UI Semibold", 15f), Location = new Point(88, 16), BackColor = Color.Transparent
             };
             var sub = new Label
@@ -410,16 +492,16 @@ namespace AppImg.Setup
 
             cbAssoc = new CheckBox
             {
-                Text = L.T("Proponi AppImg in \"Apri con\" per le immagini", "Offer AppImg in \"Open with\" for images"),
+                Text = L.T("Proponi CorbolImg in \"Apri con\" per le immagini", "Offer CorbolImg in \"Open with\" for images"),
                 Location = new Point(22, 164), AutoSize = true, Checked = Installer.AssociationsEnabled()
             };
             cbSendTo = new CheckBox
             {
-                Text = L.T("Aggiungi AppImg al menu \"Invia a\" di Esplora file", "Add AppImg to the File Explorer \"Send to\" menu"),
+                Text = L.T("Aggiungi CorbolImg al menu \"Invia a\" di Esplora file", "Add CorbolImg to the File Explorer \"Send to\" menu"),
                 Location = new Point(22, 164), AutoSize = true, Checked = Installer.SendToEnabled()
             };
             cbDesktop = new CheckBox { Text = L.T("Crea un collegamento sul desktop", "Create a desktop shortcut"), Location = new Point(22, 188), AutoSize = true, Checked = Installer.DesktopShortcutExists() };
-            cbLaunch = new CheckBox { Text = L.T("Avvia AppImg al termine", "Launch AppImg when finished"), Location = new Point(22, 212), AutoSize = true, Checked = true };
+            cbLaunch = new CheckBox { Text = L.T("Avvia CorbolImg al termine", "Launch CorbolImg when finished"), Location = new Point(22, 212), AutoSize = true, Checked = true };
 
             lblStatus = new Label { Location = new Point(20, 262), Size = new Size(240, 20), ForeColor = Color.DimGray };
             btnInstall = new Button { Text = action, Location = new Point(240, 256), MinimumSize = new Size(120, 30), AutoSize = true };
@@ -438,7 +520,7 @@ namespace AppImg.Setup
             {
                 Text = owner + lic, AutoSize = true, Location = new Point(18, 7), ForeColor = Color.DimGray,
                 LinkColor = accent, ActiveLinkColor = accent,
-                LinkBehavior = LinkBehavior.HoverUnderline, BackColor = Color.Transparent
+                LinkBehavior = LinkBehavior.AlwaysUnderline, BackColor = Color.Transparent
             };
             credits.LinkArea = new LinkArea(owner.Length, lic.Length);
             credits.LinkClicked += delegate { OpenUrl(AppVersion.RepoUrl + "/blob/main/LICENSE"); };
@@ -446,7 +528,7 @@ namespace AppImg.Setup
             {
                 Text = "GitHub", AutoSize = true, Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 LinkColor = accent, ActiveLinkColor = accent,
-                LinkBehavior = LinkBehavior.HoverUnderline, BackColor = Color.Transparent
+                LinkBehavior = LinkBehavior.AlwaysUnderline, BackColor = Color.Transparent
             };
             site.LinkClicked += delegate { OpenUrl(AppVersion.RepoUrl); };
             footer.Controls.AddRange(new Control[] { credits, site });
@@ -488,23 +570,23 @@ namespace AppImg.Setup
             {
                 Installer.Install(cbDesktop.Checked, cbSendTo.Checked, cbAssoc.Checked, cbLaunch.Checked);
                 Cursor = Cursors.Default;
-                string done = L.T("AppImg è stata installata.\n\n" +
+                string done = L.T("CorbolImg è stata installata.\n\n" +
                         "La trovi nel menu Start. Per convertire più immagini: selezionale in Esplora file → tasto destro → " +
-                        "Invia a → AppImg.\n\n" +
-                        "Per disinstallarla: Impostazioni → App → App installate → AppImg.",
-                        "AppImg has been installed.\n\n" +
+                        "Invia a → CorbolImg.\n\n" +
+                        "Per disinstallarla: Impostazioni → App → App installate → CorbolImg.",
+                        "CorbolImg has been installed.\n\n" +
                         "You can find it in the Start menu. To convert several images: select them in File Explorer → right-click → " +
-                        "Send to → AppImg.\n\n" +
-                        "To uninstall it: Settings → Apps → Installed apps → AppImg.");
+                        "Send to → CorbolImg.\n\n" +
+                        "To uninstall it: Settings → Apps → Installed apps → CorbolImg.");
                 if (cbAssoc.Checked)
                 {
                     // Windows non permette ai programmi di diventare predefiniti da soli: si apre la pagina giusta delle Impostazioni
-                    if (MessageBox.Show(this, done + "\n\n" + L.T("Vuoi aprire le immagini con AppImg quando fai doppio clic? Si aprirà Impostazioni → App predefinite: scegli AppImg per i tipi di file che vuoi.",
-                                                                  "Do you want images to open in AppImg when you double-click them? Settings → Default apps will open: choose AppImg for the file types you want."),
-                            "AppImg", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
-                        OpenUrl("ms-settings:defaultapps?registeredAppUser=AppImg");
+                    if (MessageBox.Show(this, done + "\n\n" + L.T("Vuoi aprire le immagini con CorbolImg quando fai doppio clic? Si aprirà Impostazioni → App predefinite: scegli CorbolImg per i tipi di file che vuoi.",
+                                                                  "Do you want images to open in CorbolImg when you double-click them? Settings → Default apps will open: choose CorbolImg for the file types you want."),
+                            "CorbolImg", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
+                        OpenUrl("ms-settings:defaultapps?registeredAppUser=CorbolImg");
                 }
-                else MessageBox.Show(this, done, "AppImg", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                else MessageBox.Show(this, done, "CorbolImg", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 Close();
             }
             catch (Exception ex)
@@ -512,7 +594,7 @@ namespace AppImg.Setup
                 Cursor = Cursors.Default;
                 lblStatus.Text = "";
                 btnInstall.Enabled = btnCancel.Enabled = true;
-                MessageBox.Show(this, L.T("Installazione non riuscita:", "Installation failed:") + "\n" + ex.Message, "AppImg", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(this, L.T("Installazione non riuscita:", "Installation failed:") + "\n" + ex.Message, "CorbolImg", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }

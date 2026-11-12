@@ -1,4 +1,4 @@
-// AppImg - visualizzatore di immagini per Windows, con convertitore di formato.
+// CorbolImg - visualizzatore di immagini per Windows, con convertitore di formato.
 // Apre tutto ciò che Windows sa leggere (JPEG, PNG, HEIC, WebP, AVIF, TIFF, GIF animate, BMP, ICO, RAW...)
 // e salva in PNG, JPEG, WebP, HEIC, TIFF, BMP, GIF, JPEG XR, ICO o PDF, anche molti file insieme.
 // Compatibile con il compilatore csc di .NET Framework 4.x (C# 5).
@@ -17,7 +17,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
 
-namespace AppImg
+namespace CorbolImg
 {
     static class Program
     {
@@ -25,25 +25,26 @@ namespace AppImg
         [DllImport("shell32.dll", CharSet = CharSet.Unicode)] static extern int SetCurrentProcessExplicitAppUserModelID(string id);
 
         // Deve coincidere con quello scritto dall'installer nei collegamenti
-        public const string AppUserModelId = "AppImg.Viewer";
+        public const string AppUserModelId = "AppImg.Viewer"; // come prima del cambio di nome: le icone già fissate alla barra restano della stessa app
 
         static ApplicationContext context;
         static int openForms;
         static ConverterForm converter;
 
-        // AppImg.exe [file o cartella]          -> visualizzatore (con le altre immagini della cartella)
-        // AppImg.exe file1 file2 ...            -> visualizzatore, solo con quei file
-        // AppImg.exe /convert [file o cartelle] -> convertitore (usato da "Invia a > AppImg")
+        // CorbolImg.exe [file o cartella]          -> visualizzatore (con le altre immagini della cartella)
+        // CorbolImg.exe file1 file2 ...            -> visualizzatore, solo con quei file
+        // CorbolImg.exe /convert [file o cartelle] -> convertitore (usato da "Invia a > CorbolImg")
         [STAThread]
         static void Main(string[] args)
         {
             try { SetProcessDPIAware(); } catch { }
+            OldApp.MoveLeftovers(); // dati rimasti nelle cartelle col nome vecchio (AppImg)
             try { SetCurrentProcessExplicitAppUserModelID(AppUserModelId); } catch { }
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             // Un errore imprevisto nell'interfaccia mostra un messaggio invece di chiudere l'app
             Application.ThreadException += (s, e) =>
-                MessageBox.Show(L.T("Si è verificato un errore:", "An error occurred:") + "\n" + e.Exception.Message, "AppImg", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(L.T("Si è verificato un errore:", "An error occurred:") + "\n" + e.Exception.Message, "CorbolImg", MessageBoxButtons.OK, MessageBoxIcon.Error);
 
             Settings.Load();
             L.Set(Settings.Get("lang", "auto"));
@@ -146,10 +147,10 @@ namespace AppImg
         }
     }
 
-    // Impostazioni in %APPDATA%\AppImg\settings.txt, righe "chiave=valore".
+    // Impostazioni in %APPDATA%\CorbolImg\settings.txt, righe "chiave=valore".
     static class Settings
     {
-        static readonly string Path_ = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AppImg", "settings.txt");
+        static readonly string Path_ = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CorbolImg", "settings.txt");
         static readonly Dictionary<string, string> values = new Dictionary<string, string>();
 
         public static void Load()
@@ -213,7 +214,7 @@ namespace AppImg
                     try { ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; } catch { }
                     var req = (HttpWebRequest)WebRequest.Create(AppVersion.RepoUrl.Replace("https://github.com/", "https://api.github.com/repos/") + "/releases/latest");
                     req.Timeout = 10000;
-                    req.UserAgent = "AppImg/" + AppVersion.Text;
+                    req.UserAgent = "CorbolImg/" + AppVersion.Text;
                     req.Accept = "application/vnd.github+json";
                     string json;
                     using (var resp = req.GetResponse())
@@ -247,7 +248,7 @@ namespace AppImg
                 if (manual) Offer(ui);
             }
             else if (manual)
-                Msg(ui, L.F("Hai già l'ultima versione di AppImg ({0}).", "You already have the latest version of AppImg ({0}).", AppVersion.Text),
+                Msg(ui, L.F("Hai già l'ultima versione di CorbolImg ({0}).", "You already have the latest version of CorbolImg ({0}).", AppVersion.Text),
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
@@ -256,8 +257,8 @@ namespace AppImg
             if (Version == null) return;
             string page = AppVersion.RepoUrl + "/releases/tag/v" + Version;
             if (Url == null) { Util.OpenUrl(page); return; }
-            var r = Msg(ui, L.F("È disponibile AppImg {0} (installata: {1}).\n\nScaricare e installare ora? L'installer chiuderà AppImg durante l'aggiornamento; le impostazioni restano.\n\nNovità: {2}",
-                                "AppImg {0} is available (installed: {1}).\n\nDownload and install it now? The installer will close AppImg during the update; your settings are kept.\n\nWhat's new: {2}",
+            var r = Msg(ui, L.F("È disponibile CorbolImg {0} (installata: {1}).\n\nScaricare e installare ora? L'installer chiuderà CorbolImg durante l'aggiornamento; le impostazioni restano.\n\nNovità: {2}",
+                                "CorbolImg {0} is available (installed: {1}).\n\nDownload and install it now? The installer will close CorbolImg during the update; your settings are kept.\n\nWhat's new: {2}",
                                 Version, AppVersion.Text, page), MessageBoxButtons.YesNo, MessageBoxIcon.Information);
             if (r == DialogResult.Yes) Download(ui, Url, Sha, Version, page);
         }
@@ -266,14 +267,14 @@ namespace AppImg
         {
             ThreadPool.QueueUserWorkItem(delegate
             {
-                string file = Path.Combine(Path.GetTempPath(), "AppImg-Setup-" + ver + ".exe");
+                string file = Path.Combine(Path.GetTempPath(), "CorbolImg-Setup-" + ver + ".exe");
                 string err = null;
                 try
                 {
                     try { ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; } catch { }
                     using (var wc = new WebClient())
                     {
-                        wc.Headers[HttpRequestHeader.UserAgent] = "AppImg/" + AppVersion.Text;
+                        wc.Headers[HttpRequestHeader.UserAgent] = "CorbolImg/" + AppVersion.Text;
                         wc.DownloadFile(url, file);
                     }
                     if (sha != null)
@@ -311,7 +312,7 @@ namespace AppImg
 
         static DialogResult Msg(Control owner, string text, MessageBoxButtons buttons, MessageBoxIcon icon)
         {
-            return MessageBox.Show(owner, text, "AppImg", buttons, icon);
+            return MessageBox.Show(owner, text, "CorbolImg", buttons, icon);
         }
     }
 
@@ -329,7 +330,7 @@ namespace AppImg
 
         AboutForm(Icon icon)
         {
-            Text = L.T("Informazioni su AppImg", "About AppImg");
+            Text = L.T("Informazioni su CorbolImg", "About CorbolImg");
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = MinimizeBox = false;
             ShowInTaskbar = false;
@@ -345,8 +346,8 @@ namespace AppImg
             var pic = new PictureBox { Location = new Point(20, 20), Size = new Size(48, 48), SizeMode = PictureBoxSizeMode.Zoom };
             try
             {
-                // Le immagini in appimg.ico sono PNG: si legge direttamente quella da 64 px
-                using (var st = typeof(AboutForm).Assembly.GetManifestResourceStream("AppImg.appimg.ico"))
+                // Le immagini in corbolimg.ico sono PNG: si legge direttamente quella da 64 px
+                using (var st = typeof(AboutForm).Assembly.GetManifestResourceStream("CorbolImg.corbolimg.ico"))
                 using (var ms = new MemoryStream())
                 {
                     st.CopyTo(ms);
@@ -363,7 +364,7 @@ namespace AppImg
                 }
             }
             catch { }
-            var title = new Label { Text = "AppImg " + AppVersion.Text, AutoSize = true, Location = new Point(82, 18), Font = new Font("Segoe UI Semibold", 14f) };
+            var title = new Label { Text = "CorbolImg " + AppVersion.Text, AutoSize = true, Location = new Point(82, 18), Font = new Font("Segoe UI Semibold", 14f) };
             var desc = new Label
             {
                 Text = L.T("Visualizzatore di immagini con convertitore: JPEG, PNG, HEIC, WebP, TIFF, GIF, BMP, ICO, PDF e altri",
