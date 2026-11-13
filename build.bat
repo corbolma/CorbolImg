@@ -18,7 +18,7 @@ for %%F in (lang\*.txt) do if /i not "%%~nF"=="_template" call set LANGRES=%%LAN
   /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Core.dll /r:Microsoft.VisualBasic.dll ^
   /r:System.Web.Extensions.dll /r:System.Security.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll ^
   /r:"%WPF%\PresentationCore.dll" /r:"%WPF%\WindowsBase.dll" /r:System.Xaml.dll ^
-  CorbolImg.cs Viewer.cs Converter.cs Imaging.cs Grid.cs Ai.cs Esrgan.cs Version.cs Lang.cs OldApp.cs %LANGRES%
+  CorbolImg.cs Viewer.cs Converter.cs Imaging.cs Grid.cs Edits.cs Ai.cs Esrgan.cs Version.cs Lang.cs OldApp.cs %LANGRES%
 if errorlevel 1 (
   echo Compilazione fallita.
   exit /b 1

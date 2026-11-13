@@ -2,7 +2,8 @@
 // Ogni riquadro si può migliorare con Real-ESRGAN (ingrandimento x2/x3/x4 con ricostruzione dei dettagli),
 // salvare da solo, oppure "aprire" come nuova scacchiera da suddividere di nuovo, e così via in profondità.
 // L'assistente (Claude Code, Claude o un servizio compatibile OpenAI) riceve le richieste scritte
-// ("migliora F3 e salvalo", "zooma sulla targa") e risponde con le azioni che CorbolImg esegue.
+// ("migliora F3 e salvalo", "zooma sulla targa", "schiarisci B2") e risponde con le azioni che CorbolImg esegue,
+// compresi i ritocchi dei riquadri (Edits.cs).
 // Compatibile con il compilatore csc di .NET Framework 4.x (C# 5).
 using System;
 using System.Collections.Generic;
@@ -18,12 +19,31 @@ using System.Windows.Forms;
 
 namespace CorbolImg
 {
+    // Versione cambiata di un riquadro: migliorata con Real-ESRGAN (Model, Scale), ritoccata (Edits) o entrambe
     class GridResult : IDisposable
     {
-        public Bitmap Image;
-        public int Scale;
-        public EsrganModel Model;
-        public void Dispose() { if (Image != null) { Image.Dispose(); Image = null; } }
+        public Bitmap Image;                                    // versione attuale
+        public int Scale = 1;
+        public EsrganModel Model;                               // null: non migliorato
+        public Bitmap Base;                                     // migliorato e poi ritoccato: la versione prima dei ritocchi (per Annulla)
+        public readonly List<EditOp> Edits = new List<EditOp>();
+
+        public bool Enhanced { get { return Model != null; } }
+        public bool Edited { get { return Edits.Count > 0; } }
+
+        public string Key()
+        {
+            var parts = new List<string>();
+            if (Enhanced) parts.Add("enhanced x" + Scale + " " + Model.Key);
+            if (Edited) parts.Add("edits: " + string.Join(", ", Edits.Select(e => e.Key())));
+            return string.Join("; ", parts);
+        }
+
+        public void Dispose()
+        {
+            if (Image != null) { Image.Dispose(); Image = null; }
+            if (Base != null) { Base.Dispose(); Base = null; }
+        }
     }
 
     // Un livello della scacchiera: l'immagine intera o un riquadro aperto
@@ -69,6 +89,61 @@ namespace CorbolImg
             if (i == 0 || i == s.Length || !int.TryParse(s.Substring(i), NumberStyles.None, CultureInfo.InvariantCulture, out row)) return false;
             c = col - 1; r = row - 1;
             return c < Cols && r < Rows && r >= 0;
+        }
+
+        // Riquadri ritoccati che si possono rimettere al loro posto nella scacchiera (stesse proporzioni)
+        public IEnumerable<KeyValuePair<Rectangle, Bitmap>> EditedTiles()
+        {
+            for (int c = 0; c < Cols; c++)
+                for (int r = 0; r < Rows; r++)
+                {
+                    GridResult res;
+                    if (!Done.TryGetValue(CellName(c, r), out res) || !res.Edited) continue;
+                    var rc = Cell(c, r);
+                    if (Math.Abs((double)res.Image.Width / res.Image.Height - (double)rc.Width / rc.Height) > 0.02 * rc.Width / rc.Height) continue;
+                    yield return new KeyValuePair<Rectangle, Bitmap>(rc, res.Image);
+                }
+        }
+
+        public bool HasEdits { get { return Done.Values.Any(d => d.Edited); } }
+
+        // La scacchiera intera con i riquadri ritoccati (nuova bitmap). Con griglia 1×1 è la versione ritoccata di A1.
+        public Bitmap Composite()
+        {
+            GridResult one;
+            if (Cols == 1 && Rows == 1 && Done.TryGetValue("A1", out one) && one.Edited) return new Bitmap(one.Image);
+            var bmp = new Bitmap(Image);
+            using (var g = Graphics.FromImage(bmp))
+            {
+                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                g.CompositingMode = CompositingMode.SourceCopy;
+                foreach (var t in EditedTiles()) g.DrawImage(t.Value, t.Key);
+            }
+            return bmp;
+        }
+
+        // Scacchiera ridotta a size per lo schermo o per l'assistente, con i riquadri ritoccati
+        // (un riquadro ruotato di 90° non ha più le proporzioni della casella: si vede nell'anteprima, non qui)
+        public Bitmap Shown(Size size)
+        {
+            var bmp = Imaging.Scale(Image, size);
+            if (!HasEdits) return bmp;
+            using (var g = Graphics.FromImage(bmp))
+            {
+                g.InterpolationMode = InterpolationMode.HighQualityBilinear;
+                g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                g.CompositingMode = CompositingMode.SourceCopy;
+                double kx = (double)size.Width / Image.Width, ky = (double)size.Height / Image.Height;
+                foreach (var t in EditedTiles())
+                {
+                    var rc = t.Key;
+                    int x0 = (int)Math.Round(rc.X * kx), y0 = (int)Math.Round(rc.Y * ky);
+                    int x1 = (int)Math.Round(rc.Right * kx), y1 = (int)Math.Round(rc.Bottom * ky);
+                    if (x1 > x0 && y1 > y0) g.DrawImage(t.Value, new Rectangle(x0, y0, x1 - x0, y1 - y0));
+                }
+            }
+            return bmp;
         }
 
         public void ClearDone()
@@ -149,9 +224,10 @@ namespace CorbolImg
                             g.FillRectangle(pill, cr.X + 2, cr.Y + 2, sz.Width, sz.Height);
                             g.DrawString(name, small, white, cr.X + 2, cr.Y + 2);
                         }
-                        if (b.Done.ContainsKey(name) && cr.Width >= 20)
+                        GridResult done;
+                        if (b.Done.TryGetValue(name, out done) && cr.Width >= 20)
                         {
-                            string t = L.T("IA", "AI");
+                            string t = done.Enhanced && done.Edited ? L.T("IA+R", "AI+E") : done.Enhanced ? L.T("IA", "AI") : L.T("R", "E");
                             var sz = g.MeasureString(t, small);
                             g.FillRectangle(badge, cr.Right - sz.Width - 3, cr.Y + 3, sz.Width, sz.Height);
                             g.DrawString(t, small, white, cr.Right - sz.Width - 3, cr.Y + 3);
@@ -182,10 +258,11 @@ namespace CorbolImg
                 int w = Math.Max(1, (int)(b.Image.Width * k)), h = Math.Max(1, (int)(b.Image.Height * k));
                 using (var bmp = new Bitmap(w + band + 4, h + band + 4, PixelFormat.Format24bppRgb))
                 using (var g = Graphics.FromImage(bmp))
+                using (var shown = b.Shown(new Size(w, h)))   // l'assistente vede anche i ritocchi
                 {
                     g.Clear(Color.White);
                     var ir = new Rectangle(band, band, w, h);
-                    Paint(g, b, b.Image, ir, font, Color.Black, true);
+                    Paint(g, b, shown, ir, font, Color.Black, true);
                     using (var ms = new MemoryStream())
                     {
                         var enc = ImageCodecInfo.GetImageEncoders().First(e => e.FormatID == ImageFormat.Jpeg.Guid);
@@ -237,7 +314,7 @@ namespace CorbolImg
             if (shown == null || shown.Size != ir.Size)
             {
                 if (shown != null) shown.Dispose();
-                shown = Imaging.Scale(Board.Image, ir.Size);
+                shown = Board.Shown(ir.Size);
             }
             GridPainter.Paint(g, Board, shown, ir, Font, Color.FromArgb(90, 90, 90), false);
         }
@@ -288,8 +365,19 @@ The actions run in order:
 {""do"":""enter"",""cell"":""F3""}  zoom into the cell: it becomes the current board, with the same grid as its parent unless you send ""grid"" afterwards
 {""do"":""back""}  return to the previous board
 {""do"":""top""}  return to the whole image
+{""do"":""edit"",""cell"":""F3"",""op"":""brightness"",""amount"":25}  retouch the cell on the user's PC, starting from its current version (enhanced and already edited, if so). op and amount:
+  brightness, contrast, saturation: -100..100 (saturation -100 = black and white); temperature: -100..100 (> 0 warmer, < 0 cooler)
+  auto_levels: no amount, fixes dull, hazy or color-tinted photos; grayscale, sepia: no amount
+  sharpen, denoise: 1..100; blur: 1..100 (strength)
+  pixelate: 2..100 = number of blocks across the short side of the area (fewer = coarser; 6-10 hides a face or a plate)
+  rotate: degrees clockwise, 90, 180 or 270, or a small angle from -45 to 45 to straighten a tilted horizon (the edges are cropped, the size stays)
+  flip: with ""dir"":""horizontal"" or ""vertical""
+  ""area"":[x,y,w,h] (optional, not for rotate and flip): change only that part of the cell, as fractions 0-1 of the cell, 0,0 = top-left corner of the cell
+{""do"":""undo"",""cell"":""F3""}  remove the last edit of the cell
+{""do"":""reset"",""cell"":""F3""}  back to the original cell (drops enhancement and edits)
 
-Rules: cell names always refer to the current board at that point of the sequence. The enhanced result is limited to 80 megapixels: for big cells prefer scale 2, or enter the cell and work on smaller cells. ""Zoom with AI into F3"" means enhance F3 and then enter it. If you see the image, use it to find what the user describes (a face, a plate, a sign) and name the cells you chose in ""say"". If the request is unclear, ask in ""say"" with no actions. Do not claim results: the app reports what happened in the next message.";
+Rules: cell names always refer to the current board at that point of the sequence. The enhanced result is limited to 80 megapixels: for big cells prefer scale 2, or enter the cell and work on smaller cells. ""Zoom with AI into F3"" means enhance F3 and then enter it. If you see the image, use it to find what the user describes (a face, a plate, a sign) and name the cells you chose in ""say"". If the request is unclear, ask in ""say"" with no actions. Do not claim results: the app reports what happened in the next message.
+Edits: use moderate amounts (10-40) unless the user asks for a strong change, and chain several edits when useful (for example auto_levels, then sharpen 30). Edited cells show in the board you see and are included when the whole board is saved. To edit the whole image, first send grid with 1 column and 1 row, then edit A1 (changing the grid discards the enhanced and edited cells of that board). To hide or fix something small, use ""area"" inside the cell, or enter the cell and edit its smaller cells: when you go back, those edits are carried to the parent cell (rotate, flip and enhancements made inside are not). Enhancing an edited cell starts again from the original and applies the same edits to the enlarged result.";
 
         readonly string sourcePath;
         readonly int turns;
@@ -527,7 +615,7 @@ Rules: cell names always refer to the current board at that point of the sequenc
             bool has = board != null && board.Image != null;
             bool sel = has && board.HasSel;
             lPath.Text = !has ? "" : board.Parent == null ? Path.GetFileName(sourcePath) + "  ·  " + board.Image.Width + "×" + board.Image.Height
-                                                          : board.PathText + (board.From != null ? "  (" + L.T("IA", "AI") + " ×" + board.From.Scale + ")" : "") + "  ·  " + board.Image.Width + "×" + board.Image.Height;
+                                                          : board.PathText + FromText(board.From) + "  ·  " + board.Image.Width + "×" + board.Image.Height;
             bBack.Enabled = bTop.Enabled = has && board.Parent != null && !Busy;
             nCols.Enabled = nRows.Enabled = has && !Busy;
             if (has)
@@ -553,8 +641,11 @@ Rules: cell names always refer to the current board at that point of the sequenc
                 if (board.Done.TryGetValue(name, out res))
                 {
                     preview.Image = Imaging.Scale(res.Image, Fit(res.Image.Size, preview.ClientSize));
-                    lPreview.Text = L.F("Migliorato con IA ×{0} ({1}) · {2}×{3} px", "Enhanced with AI ×{0} ({1}) · {2}×{3} px",
-                                        res.Scale, res.Model.Name, res.Image.Width, res.Image.Height);
+                    var parts = new List<string>();
+                    if (res.Enhanced) parts.Add(L.F("Migliorato con IA ×{0} ({1})", "Enhanced with AI ×{0} ({1})", res.Scale, res.Model.Name));
+                    if (res.Edited) parts.Add(L.T("Ritocchi:", "Edits:") + " " + string.Join(", ", res.Edits.Select(e => e.Describe())));
+                    parts.Add(res.Image.Width + "×" + res.Image.Height + " px");
+                    lPreview.Text = string.Join(" · ", parts);
                 }
                 else
                 {
@@ -569,6 +660,15 @@ Rules: cell names always refer to the current board at that point of the sequenc
                 lCell.Text = has ? L.T("Scegli un riquadro", "Pick a tile") : "";
                 lPreview.Text = "";
             }
+        }
+
+        static string FromText(GridResult from)
+        {
+            if (from == null) return "";
+            var parts = new List<string>();
+            if (from.Enhanced) parts.Add(L.T("IA", "AI") + " ×" + from.Scale);
+            if (from.Edited) parts.Add(L.T("ritoccato", "edited"));
+            return "  (" + string.Join(", ", parts) + ")";
         }
 
         static Size Fit(Size img, Size box)
@@ -669,8 +769,8 @@ Rules: cell names always refer to the current board at that point of the sequenc
             cols = Math.Max(1, Math.Min(26, cols)); rows = Math.Max(1, Math.Min(50, rows));
             if (cols == board.Cols && rows == board.Rows) return true;
             if (ask && board.Done.Count > 0 &&
-                MessageBox.Show(this, L.F("Cambiando la griglia si perdono i riquadri migliorati di questa scacchiera ({0}). Continuare?",
-                                          "Changing the grid discards the enhanced tiles of this grid ({0}). Continue?", board.Done.Count),
+                MessageBox.Show(this, L.F("Cambiando la griglia si perdono i riquadri migliorati o ritoccati di questa scacchiera ({0}). Continuare?",
+                                          "Changing the grid discards the enhanced or edited tiles of this grid ({0}). Continue?", board.Done.Count),
                                 "CorbolImg", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
             {
                 UpdateUi();
@@ -701,6 +801,7 @@ Rules: cell names always refer to the current board at that point of the sequenc
             if (board == null || board.Parent == null) return;
             var old = board;
             board = old.Parent;
+            CarryEdits(old);
             old.Dispose();
             ShowBoard();
         }
@@ -748,6 +849,9 @@ Rules: cell names always refer to the current board at that point of the sequenc
                 var b = board;
                 string name = GridBoard.CellName(c, r);
                 var crop = b.Image.Clone(b.Cell(c, r), PixelFormat.Format32bppArgb);
+                // si migliora sempre l'originale; i ritocchi già fatti si riapplicano al risultato ingrandito
+                GridResult prev;
+                var edits = b.Done.TryGetValue(name, out prev) ? prev.Edits.ToList() : new List<EditOp>();
                 var token = cts.Token;
                 working = true;
                 SelectCell(c, r);
@@ -757,11 +861,16 @@ Rules: cell names always refer to the current board at that point of the sequenc
                 {
                     string err;
                     var t0 = DateTime.Now;
-                    Bitmap result;
+                    Bitmap result, edited = null;
                     using (crop)
                         result = Esrgan.Upscale(crop, model, sc,
                             p => Ui(delegate { SetStatus(L.F("Miglioramento di {0} ×{1}... {2}%", "Enhancing {0} ×{1}... {2}%", name, sc, p), p); }),
                             token, out err);
+                    if (result != null && edits.Count > 0)
+                    {
+                        try { edited = ImageEdits.ApplyAll(result, edits); }
+                        catch (Exception ex) { err = ex.Message; result.Dispose(); result = null; }
+                    }
                     Ui(delegate
                     {
                         working = false;
@@ -769,7 +878,10 @@ Rules: cell names always refer to the current board at that point of the sequenc
                         {
                             GridResult old;
                             if (b.Done.TryGetValue(name, out old)) old.Dispose();
-                            b.Done[name] = new GridResult { Image = result, Scale = sc, Model = model };
+                            var nr = new GridResult { Image = edited ?? result, Base = edited != null ? result : null, Scale = sc, Model = model };
+                            nr.Edits.AddRange(edits);
+                            b.Done[name] = nr;
+                            canvas.BoardChanged();
                             string msg = L.F("{0} migliorato ×{1}: {2}×{3} px in {4:0.0} s", "{0} enhanced ×{1}: {2}×{3} px in {4:0.0} s",
                                              name, sc, result.Width, result.Height, (DateTime.Now - t0).TotalSeconds);
                             SetStatus(msg);
@@ -780,6 +892,7 @@ Rules: cell names always refer to the current board at that point of the sequenc
                             return;
                         }
                         if (result != null) result.Dispose();
+                        if (edited != null) edited.Dispose();
                         SetStatus("");
                         UpdateUi();
                         results.Add("enhance " + name + ": failed (" + err + ")");
@@ -794,11 +907,178 @@ Rules: cell names always refer to the current board at that point of the sequenc
             });
         }
 
-        // Il riquadro (migliorato, se c'è) o, con c < 0, la scacchiera intera; nuova bitmap da liberare
+        // ===================== Ritocchi =====================
+
+        // Ricalcola il riquadro con i ritocchi edits, sul PC e fuori dal thread dell'interfaccia:
+        // si parte dalla versione prima dei ritocchi (migliorata, se lo è) o, se non serve ripartire, da start.
+        void Retouch(int c, int r, string label, List<EditOp> edits, bool fromStart, Action<bool> done)
+        {
+            var b = board;
+            string name = GridBoard.CellName(c, r);
+            GridResult cur;
+            b.Done.TryGetValue(name, out cur);
+            Bitmap src;
+            List<EditOp> todo;
+            if (!fromStart && cur != null) { src = new Bitmap(cur.Image); todo = edits.Skip(cur.Edits.Count).ToList(); }
+            else if (cur != null && cur.Enhanced) { src = new Bitmap(cur.Base ?? cur.Image); todo = edits; }
+            else { src = b.Image.Clone(b.Cell(c, r), PixelFormat.Format32bppArgb); todo = edits; }
+            if ((long)src.Width * src.Height > ImageEdits.MaxPixels)
+            {
+                src.Dispose();
+                string msg = L.F("{0} è troppo grande da ritoccare ({1} megapixel, massimo {2}): aprilo e ritocca i riquadri più piccoli.",
+                                 "{0} is too big to edit ({1} megapixels, at most {2}): enter it and edit the smaller tiles.",
+                                 name, (long)src.Width * src.Height / 1000000, ImageEdits.MaxPixels / 1000000);
+                results.Add(label + ": failed, the cell is too big (enter it and edit its smaller cells)");
+                if (aiRunning) Log(msg, CError); else MessageBox.Show(this, msg, "CorbolImg", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                done(false);
+                return;
+            }
+            working = true;
+            SelectCell(c, r);
+            SetStatus(L.F("Ritocco di {0}...", "Editing {0}...", name));
+            UpdateUi();
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                Bitmap result = null;
+                string err = null;
+                try { result = ImageEdits.ApplyAll(src, todo); }
+                catch (Exception ex) { err = ex is OutOfMemoryException ? L.T("memoria insufficiente", "not enough memory") : ex.Message; }
+                finally { src.Dispose(); }
+                Ui(delegate
+                {
+                    working = false;
+                    if (result == null || board != b || b.Image == null)
+                    {
+                        if (result != null) result.Dispose();
+                        SetStatus("");
+                        UpdateUi();
+                        results.Add(label + ": failed" + (err != null ? " (" + err + ")" : ""));
+                        if (err != null) { if (aiRunning) Log(L.F("Ritocco di {0} non riuscito: {1}", "Editing {0} failed: {1}", name, err), CError); }
+                        done(false);
+                        return;
+                    }
+                    GridResult now;
+                    b.Done.TryGetValue(name, out now);
+                    var nr = new GridResult { Image = result };
+                    if (now != null && now.Enhanced)
+                    {
+                        nr.Model = now.Model; nr.Scale = now.Scale;
+                        nr.Base = now.Base ?? now.Image;          // la versione migliorata senza ritocchi resta per Annulla
+                        if (nr.Base == now.Image) now.Image = null;
+                        now.Base = null;
+                    }
+                    if (now != null) now.Dispose();
+                    nr.Edits.AddRange(edits);
+                    string size = result.Width + "x" + result.Height + " px";
+                    string desc = nr.Edited ? string.Join(", ", nr.Edits.Select(e => e.Describe())) : L.T("nessun ritocco", "no edits");
+                    if (!nr.Edited && nr.Base != null) { nr.Image.Dispose(); nr.Image = nr.Base; nr.Base = null; }   // tolti tutti i ritocchi: resta il migliorato
+                    if (!nr.Enhanced && !nr.Edited) { nr.Dispose(); b.Done.Remove(name); }
+                    else b.Done[name] = nr;
+                    canvas.BoardChanged();
+                    UpdateUi();
+                    SetStatus(name + ": " + desc);
+                    results.Add(label + ": done, " + size);
+                    done(true);
+                });
+            });
+        }
+
+        void EditCell(int c, int r, EditOp op, Action<bool> done)
+        {
+            string name = GridBoard.CellName(c, r);
+            GridResult cur;
+            var edits = board.Done.TryGetValue(name, out cur) ? cur.Edits.ToList() : new List<EditOp>();
+            edits.Add(op);
+            Retouch(c, r, "edit " + name + " " + op.Key(), edits, false, done);
+        }
+
+        void UndoCell(int c, int r, Action<bool> done)
+        {
+            string name = GridBoard.CellName(c, r);
+            GridResult cur;
+            if (!board.Done.TryGetValue(name, out cur) || !cur.Edited)
+            {
+                results.Add("undo " + name + ": nothing to undo");
+                done(true);
+                return;
+            }
+            var edits = cur.Edits.Take(cur.Edits.Count - 1).ToList();
+            Retouch(c, r, "undo " + name, edits, true, done);
+        }
+
+        void ResetCell(int c, int r)
+        {
+            string name = GridBoard.CellName(c, r);
+            GridResult cur;
+            if (board.Done.TryGetValue(name, out cur)) { cur.Dispose(); board.Done.Remove(name); }
+            results.Add("reset " + name + ": back to the original");
+            canvas.BoardChanged();
+            UpdateUi();
+        }
+
+        // Tornando indietro, i ritocchi fatti nei riquadri del livello chiuso passano al suo riquadro nel livello superiore
+        // (come ritocchi di una zona). Rotazioni, specchio e miglioramenti fatti dentro non si possono riportare.
+        void CarryEdits(GridBoard child)
+        {
+            var parent = child.Parent;
+            int pc, pr;
+            if (parent == null || !child.HasEdits || !parent.Parse(child.Name, out pc, out pr)) return;
+            var ops = new List<EditOp>();
+            int lost = 0;
+            float W = child.Image.Width, H = child.Image.Height;
+            foreach (var kv in child.Done.OrderBy(k => k.Key))
+            {
+                int c, r;
+                if (!kv.Value.Edited || !child.Parse(kv.Key, out c, out r)) continue;
+                var rc = child.Cell(c, r);
+                var t = new RectangleF(rc.X / W, rc.Y / H, rc.Width / W, rc.Height / H);
+                foreach (var e in kv.Value.Edits)
+                {
+                    if (e.Geometric) { lost++; continue; }
+                    ops.Add(e.WithArea(new RectangleF(t.X + e.Area.X * t.Width, t.Y + e.Area.Y * t.Height, e.Area.Width * t.Width, e.Area.Height * t.Height)));
+                }
+            }
+            if (ops.Count == 0) return;
+            Bitmap result;
+            try
+            {
+                Cursor = Cursors.WaitCursor;
+                result = ImageEdits.ApplyAll(child.Image, ops);   // child.Image è la versione attuale del riquadro
+            }
+            catch (Exception ex)
+            {
+                Log(L.F("I ritocchi di {0} non si possono riportare: {1}", "The edits of {0} cannot be carried back: {1}", child.Name, ex.Message), CError);
+                return;
+            }
+            finally { Cursor = Cursors.Default; }
+            GridResult cur;
+            parent.Done.TryGetValue(child.Name, out cur);
+            var nr = new GridResult { Image = result };
+            if (cur != null)
+            {
+                nr.Edits.AddRange(cur.Edits);
+                if (cur.Enhanced)
+                {
+                    nr.Model = cur.Model; nr.Scale = cur.Scale;
+                    nr.Base = cur.Base ?? cur.Image;
+                    if (nr.Base == cur.Image) cur.Image = null;
+                    cur.Base = null;
+                }
+                cur.Dispose();
+            }
+            nr.Edits.AddRange(ops);
+            parent.Done[child.Name] = nr;
+            string msg = L.F("Ritocchi riportati in {0}", "Edits carried to {0}", child.Name) +
+                         (lost > 0 ? " " + L.F("(rotazioni e specchio esclusi: {0})", "(rotations and flips left out: {0})", lost) : "");
+            Log("▸ " + msg, CAction);
+            results.Add("edits of the cells inside " + child.Name + " carried to " + child.Name + (lost > 0 ? " (" + lost + " rotate/flip left out)" : ""));
+        }
+
+        // Il riquadro (migliorato o ritoccato, se lo è) o, con c < 0, la scacchiera intera con i ritocchi; nuova bitmap da liberare
         Bitmap Pixels(int c, int r, out string suffix)
         {
             suffix = Suffix(c, r);
-            if (c < 0) return new Bitmap(board.Image);
+            if (c < 0) return board.Composite();
             GridResult res;
             if (board.Done.TryGetValue(GridBoard.CellName(c, r), out res)) return new Bitmap(res.Image);
             return board.Image.Clone(board.Cell(c, r), PixelFormat.Format32bppArgb);
@@ -807,10 +1087,15 @@ Rules: cell names always refer to the current board at that point of the sequenc
         // Nome del file: foto_F3-B2_x4 (percorso dei riquadri e ingrandimento)
         string Suffix(int c, int r)
         {
-            if (c < 0) return board.Parent == null ? "" : "_" + board.PathFile + (board.From != null ? "_x" + board.From.Scale : "");
+            if (c < 0)
+            {
+                bool edited = board.HasEdits || (board.From != null && board.From.Edited);
+                return (board.Parent == null ? "" : "_" + board.PathFile + (board.From != null && board.From.Enhanced ? "_x" + board.From.Scale : "")) + (edited ? "_mod" : "");
+            }
             string name = GridBoard.CellName(c, r), path = board.PathFile;
             GridResult res;
-            return "_" + (path.Length > 0 ? path + "-" : "") + name + (board.Done.TryGetValue(name, out res) ? "_x" + res.Scale : "");
+            board.Done.TryGetValue(name, out res);
+            return "_" + (path.Length > 0 ? path + "-" : "") + name + (res != null && res.Enhanced ? "_x" + res.Scale : "") + (res != null && res.Edited ? "_mod" : "");
         }
 
         void SaveDialog(int c, int r)
@@ -946,12 +1231,12 @@ Rules: cell names always refer to the current board at that point of the sequenc
             var st = new Dictionary<string, object>
             {
                 { "file", Path.GetFileName(sourcePath) },
-                { "current_board", b.Parent == null ? "whole image" : b.PathText.Replace(" › ", " > ") + (b.From != null ? " (enhanced x" + b.From.Scale + ")" : "") },
+                { "current_board", b.Parent == null ? "whole image" : b.PathText.Replace(" › ", " > ") + (b.From != null ? " (" + b.From.Key() + ")" : "") },
                 { "board_size_px", b.Image.Width + "x" + b.Image.Height },
                 { "grid", b.Cols + " columns (A-" + GridBoard.ColName(b.Cols - 1) + ") x " + b.Rows + " rows (1-" + b.Rows + ")" },
                 { "cell_size_px", "~" + (b.Image.Width / b.Cols) + "x" + (b.Image.Height / b.Rows) },
                 { "selected", b.HasSel ? GridBoard.CellName(b.SelCol, b.SelRow) : null },
-                { "enhanced_cells", b.Done.Select(kv => kv.Key + " x" + kv.Value.Scale + " " + kv.Value.Model.Key).ToArray() },
+                { "changed_cells", b.Done.Select(kv => kv.Key + ": " + kv.Value.Key()).ToArray() },
                 { "image_attached", AiSettings.SendImage },
                 { "user_language", L.Code }
             };
@@ -1046,6 +1331,27 @@ Rules: cell names always refer to the current board at that point of the sequenc
                 case "save":
                     if (!Cell(a, out c, out r, false)) return;
                     SaveAuto(c, r, AiJson.Str(a, "format"), ok => { if (ok) RunNext(); else EndAi(""); });
+                    break;
+                case "edit":
+                    {
+                        if (!Cell(a, out c, out r, true)) return;
+                        string err;
+                        var op = ImageEdits.Parse(a, out err);
+                        if (op == null) { results.Add("edit " + GridBoard.CellName(c, r) + ": " + err); Log(L.F("Ritocco non valido: {0}", "Invalid edit: {0}", err), CError); RunNext(); break; }
+                        Log("▸ " + L.F("Ritocca {0}: {1}", "Edit {0}: {1}", GridBoard.CellName(c, r), op.Describe()), CAction);
+                        EditCell(c, r, op, ok => { if (ok) RunNext(); else EndAi(""); });
+                        break;
+                    }
+                case "undo":
+                    if (!Cell(a, out c, out r, true)) return;
+                    Log("▸ " + L.F("Annulla l'ultimo ritocco di {0}", "Undo the last edit of {0}", GridBoard.CellName(c, r)), CAction);
+                    UndoCell(c, r, ok => { if (ok) RunNext(); else EndAi(""); });
+                    break;
+                case "reset":
+                    if (!Cell(a, out c, out r, true)) return;
+                    Log("▸ " + L.F("{0} torna originale", "{0} back to the original", GridBoard.CellName(c, r)), CAction);
+                    ResetCell(c, r);
+                    RunNext();
                     break;
                 case "enter":
                     if (!Cell(a, out c, out r, true)) return;
