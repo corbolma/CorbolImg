@@ -377,7 +377,16 @@ The actions run in order:
 {""do"":""reset"",""cell"":""F3""}  back to the original cell (drops enhancement and edits)
 
 Rules: cell names always refer to the current board at that point of the sequence. The enhanced result is limited to 80 megapixels: for big cells prefer scale 2, or enter the cell and work on smaller cells. ""Zoom with AI into F3"" means enhance F3 and then enter it. If you see the image, use it to find what the user describes (a face, a plate, a sign) and name the cells you chose in ""say"". If the request is unclear, ask in ""say"" with no actions. Do not claim results: the app reports what happened in the next message.
-Edits: use moderate amounts (10-40) unless the user asks for a strong change, and chain several edits when useful (for example auto_levels, then sharpen 30). Edited cells show in the board you see and are included when the whole board is saved. To edit the whole image, first send grid with 1 column and 1 row, then edit A1 (changing the grid discards the enhanced and edited cells of that board). To hide or fix something small, use ""area"" inside the cell, or enter the cell and edit its smaller cells: when you go back, those edits are carried to the parent cell (rotate, flip and enhancements made inside are not). Enhancing an edited cell starts again from the original and applies the same edits to the enlarged result.";
+Edits: use moderate amounts (10-40) unless the user asks for a strong change, and chain several edits when useful (for example auto_levels, then sharpen 30). Edited cells show in the board you see and are included when the whole board is saved. To edit the whole image, first send grid with 1 column and 1 row, then edit A1 (changing the grid discards the enhanced and edited cells of that board). To hide or fix something small, use ""area"" inside the cell, or enter the cell and edit its smaller cells: when you go back, those edits are carried to the parent cell (rotate, flip and enhancements made inside are not). Enhancing an edited cell starts again from the original and applies the same edits to the enlarged result.
+Blade Runner style: the user may talk like Deckard with the Esper machine in the film Blade Runner (1982), with short spoken orders, often with no cell name. Then:
+  ""enhance"" / ""migliora"" / ""zoom in"" with no cell = enhance the selected cell and enter it; if nothing is selected, choose the most interesting cell (or the center one) and name it in ""say""
+  ""track left/right/up/down"", ""spostati a destra/sinistra/su/giù"", ""move right"" = select the adjacent cell in that direction from the selected one (only select, no enhance); at the edge of the board, say so
+  ""center in on ..."", ""centra su ..."" = select the cell that holds what the user names
+  ""pull back"", ""pull out"", ""tira indietro"", ""allarga"" = back
+  ""stop"", ""wait"", ""ferma"" = no actions, just acknowledge
+  ""give me a hard copy"", ""print"", ""dammi una copia"", ""stampa"" = save the selected cell (or the whole board if nothing is selected)
+  numbers like ""enhance 224 to 176"" are Deckard's coordinates, not cell names: use the selected cell (or ask) and keep going
+After entering a cell this way, also select the cell of the new board that best continues what the user was looking at (usually a central one), so the next ""enhance"" or ""track"" works. When the user plays along, keep ""say"" very short, like the Esper machine (""Enhancing C4.""). Be honest when needed: the AI rebuilds plausible detail and cannot reveal what is not in the photo.";
 
         readonly string sourcePath;
         readonly int turns;
@@ -395,7 +404,7 @@ Edits: use moderate amounts (10-40) unless the user asks for a strong change, an
         readonly ComboBox cModel = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList }, cScale = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
         readonly Button btEnhance = new Button(), btSave = new Button(), btEnter = new Button(), btSend = new Button(), btMic = new Button();
         readonly ToolTip tips = new ToolTip();
-        readonly LinkLabel lnkSettings = new LinkLabel();
+        readonly LinkLabel lnkSettings = new LinkLabel(), lnkHelp = new LinkLabel();
         readonly RichTextBox log = new RichTextBox();
         readonly TextBox input = new TextBox();
         readonly StatusStrip status = new StatusStrip();
@@ -527,6 +536,9 @@ Edits: use moderate amounts (10-40) unless the user asks for a strong change, an
             lnkSettings.LinkBehavior = LinkBehavior.HoverUnderline;
             lnkSettings.LinkColor = lnkSettings.ActiveLinkColor = Color.FromArgb(124, 58, 237);
             lnkSettings.LinkClicked += delegate { ShowAiSettings(); };
+            lnkHelp.LinkBehavior = LinkBehavior.HoverUnderline;
+            lnkHelp.LinkColor = lnkHelp.ActiveLinkColor = Color.FromArgb(124, 58, 237);
+            lnkHelp.LinkClicked += delegate { ShowCommands(); };
             log.ReadOnly = true;
             log.BorderStyle = BorderStyle.None;
             log.BackColor = Color.FromArgb(248, 248, 248);
@@ -543,7 +555,7 @@ Edits: use moderate amounts (10-40) unless the user asks for a strong change, an
             btMic.Click += delegate { Dictate(); };
 
             side.Controls.AddRange(new Control[] { lCell, preview, lPreview, lModel, cModel, lScale, cScale, btEnhance, btSave, btEnter,
-                                                   lAi, lnkSettings, lProvider, log, input, btMic, btSend });
+                                                   lAi, lnkHelp, lnkSettings, lProvider, log, input, btMic, btSend });
             side.Resize += delegate { LayoutSide(); };
         }
 
@@ -579,8 +591,9 @@ Edits: use moderate amounts (10-40) unless the user asks for a strong change, an
             cModel.SetBounds(x, y, half + S(40), S(24)); cScale.SetBounds(x + half + S(48), y, half - S(40), S(24)); y += S(32);
             btEnhance.SetBounds(x, y, w, S(32)); y += S(36);
             btSave.SetBounds(x, y, half, S(30)); btEnter.SetBounds(x + half + S(8), y, half, S(30)); y += S(44);
-            lAi.SetBounds(x, y, w - S(100), S(24));
-            lnkSettings.SetBounds(x + w - S(100), y + S(4), S(100), S(18)); lnkSettings.TextAlign = ContentAlignment.TopRight;
+            lAi.SetBounds(x, y, w - S(180), S(24));
+            lnkHelp.SetBounds(x + w - S(180), y + S(4), S(90), S(18)); lnkHelp.TextAlign = ContentAlignment.TopRight;
+            lnkSettings.SetBounds(x + w - S(90), y + S(4), S(90), S(18)); lnkSettings.TextAlign = ContentAlignment.TopRight;
             y += S(24);
             lProvider.SetBounds(x, y, w, S(18)); y += S(22);
             int bottom = side.ClientSize.Height - side.Padding.Bottom;
@@ -604,6 +617,8 @@ Edits: use moderate amounts (10-40) unless the user asks for a strong change, an
             btEnter.Text = L.T("Suddividi riquadro", "Subdivide tile");
             lAi.Text = L.T("Assistente", "Assistant");
             lnkSettings.Text = L.T("Impostazioni", "Settings");
+            lnkHelp.Text = L.T("Comandi", "Commands");
+            tips.SetToolTip(lnkHelp, L.T("Cosa puoi chiedere all'assistente, anche alla Blade Runner", "What you can ask the assistant, Blade Runner style too"));
             tips.SetToolTip(btMic, L.T("Detta la richiesta (dettatura vocale di Windows, Win+H)", "Dictate the request (Windows voice typing, Win+H)"));
             sStop.Text = L.T("Annulla", "Cancel");
             cModel.Refresh();
@@ -699,6 +714,63 @@ Edits: use moderate amounts (10-40) unless the user asks for a strong change, an
 
         static readonly Color CUser = Color.FromArgb(30, 30, 30), CAi = Color.FromArgb(91, 33, 182), CAction = Color.FromArgb(110, 110, 110), CError = Color.FromArgb(185, 28, 28);
 
+        // Guida dei comandi nel registro dell'assistente: zoom e miglioramento, ritocchi e la scena di Blade Runner
+        void ShowCommands()
+        {
+            int start = log.TextLength;
+            ShowCommandsText();
+            // si legge dall'inizio della guida, non dalla fine
+            log.SelectionStart = Math.Min(start + 1, log.TextLength);
+            log.SelectionLength = 0;
+            log.ScrollToCaret();
+        }
+
+        void ShowCommandsText()
+        {
+            Log(L.T("Comandi per l'assistente", "Commands for the assistant"), CAi, true);
+            Log(L.T("Scrivili o dettali con il pulsante del microfono, con parole tue: l'assistente li capisce anche se non sono identici. I riquadri si chiamano come negli scacchi: A1 è in alto a sinistra.",
+                    "Type them or dictate them with the microphone button, in your own words: the assistant understands them even if they are not identical. Tiles are named like on a chessboard: A1 is the top-left one."), CAction);
+            Log(L.T("Ingrandire e migliorare un riquadro", "Zooming in and enhancing a tile"), CUser, true);
+            Log(L.T("• «zooma su C4»: apre il riquadro, che diventa una nuova scacchiera da suddividere ancora\n" +
+                    "• «migliora C4»: Real-ESRGAN lo ingrandisce ×2, ×3 o ×4 e ricostruisce i dettagli («migliora C4 ×2 con il modello disegni»)\n" +
+                    "• «zooma con l'IA su C4»: lo migliora e poi lo apre, per scendere ancora più in profondità\n" +
+                    "• «dividi in 4×4», «griglia 2×2»: cambia la scacchiera del livello attuale\n" +
+                    "• «trova la targa e rendila leggibile», «zooma sul volto»: se l'assistente vede l'immagine, sceglie lui i riquadri\n" +
+                    "• «torna indietro», «immagine intera», «salva C4 in PNG», «salva tutto»",
+                    "• \"zoom\" into C4\": opens the tile, which becomes a new board you can divide again\n" +
+                    "• \"enhance C4\": Real-ESRGAN enlarges it ×2, ×3 or ×4 and rebuilds the detail (\"enhance C4 ×2 with the drawing model\")\n" +
+                    "• \"zoom with AI into C4\": enhances it and then opens it, to go even deeper\n" +
+                    "• \"divide into 4×4\", \"2×2 grid\": changes the board of the current level\n" +
+                    "• \"find the plate and make it readable\", \"zoom on the face\": if the assistant sees the image, it picks the tiles itself\n" +
+                    "• \"go back\", \"whole image\", \"save C4 as PNG\", \"save everything\""), CUser);
+            Log(L.T("Ritocchi", "Edits"), CUser, true);
+            Log(L.T("• «più nitido C4», «togli il rumore», «livelli automatici»: per foto spente, sfocate o granulose\n" +
+                    "• «schiarisci», «più contrasto», «più caldo», «bianco e nero», «raddrizza l'orizzonte»\n" +
+                    "• «copri la targa in D4» (pixel grossi), «annulla l'ultimo ritocco», «riporta C4 all'originale»",
+                    "• \"sharpen C4\", \"remove the noise\", \"auto levels\": for dull, blurry or grainy photos\n" +
+                    "• \"brighten\", \"more contrast\", \"warmer\", \"black and white\", \"straighten the horizon\"\n" +
+                    "• \"hide the plate in D4\" (pixelate), \"undo the last edit\", \"put C4 back to the original\""), CUser);
+            Log(L.T("Come in Blade Runner", "Like in Blade Runner"), CUser, true);
+            Log(L.T("Nel film Blade Runner (Ridley Scott, 1982) Rick Deckard esamina una fotografia con la macchina Esper dando ordini a voce: ingrandisce, si sposta, ingrandisce ancora, finché in un riflesso trova quello che cerca e ne chiede una copia stampata. Nella Griglia IA puoi fare lo stesso, anche a voce con il pulsante del microfono:\n" +
+                    "• «migliora» (enhance): migliora il riquadro selezionato e ci entra\n" +
+                    "• «spostati a destra» (track right): passa al riquadro accanto; anche a sinistra, su, giù\n" +
+                    "• «centra sulla finestra» (center in): seleziona il riquadro con quello che nomini\n" +
+                    "• «tira indietro» (pull back): torna al livello precedente\n" +
+                    "• «stop»: l'assistente si ferma\n" +
+                    "• «dammi una copia» (give me a hard copy): salva il riquadro\n" +
+                    "Prova: «Zooma su B3. Migliora. Spostati a destra. Migliora ancora. Stop. Dammi una copia.»\n" +
+                    "A differenza del film, l'IA ricostruisce dettagli plausibili ma non può far comparire quello che nella foto non c'è: una targa illeggibile resta un'ipotesi.",
+                    "In the film Blade Runner (Ridley Scott, 1982) Rick Deckard examines a photograph with the Esper machine by giving spoken orders: he zooms in, moves around, zooms in again, until he finds what he is looking for in a reflection and asks for a hard copy. In the AI grid you can do the same, by voice too with the microphone button:\n" +
+                    "• \"enhance\": enhances the selected tile and goes into it\n" +
+                    "• \"track right\": moves to the next tile; left, up and down too\n" +
+                    "• \"center in on the window\": selects the tile with what you name\n" +
+                    "• \"pull back\": back to the previous level\n" +
+                    "• \"stop\": the assistant stops\n" +
+                    "• \"give me a hard copy\": saves the tile\n" +
+                    "Try: \"Zoom into B3. Enhance. Track right. Enhance again. Stop. Give me a hard copy.\"\n" +
+                    "Unlike in the film, the AI rebuilds plausible detail but cannot reveal what is not in the photo: an unreadable plate stays a guess."), CUser);
+        }
+
         void ShowAiSettings()
         {
             using (var f = new AiSettingsForm()) f.ShowDialog(this);
@@ -738,8 +810,8 @@ Edits: use moderate amounts (10-40) unless the user asks for a strong change, an
                         int cols = Settings.Get("gridCols", 8), rows = Settings.Get("gridRows", 8);
                         board = new GridBoard { Image = bmp, Cols = Math.Max(1, Math.Min(26, cols)), Rows = Math.Max(1, Math.Min(50, rows)), SelCol = -1, SelRow = -1 };
                         ShowBoard();
-                        Log(L.T("Scrivi cosa vuoi fare, per esempio: «migliora F3 e salvalo», «dividi in 4×4 e zooma su B2», «trova la targa e rendila leggibile».",
-                                "Write what you want to do, for example: \"enhance F3 and save it\", \"divide into 4×4 and zoom into B2\", \"find the plate and make it readable\"."), CAction);
+                        Log(L.T("Scrivi cosa vuoi fare, per esempio: «migliora F3 e salvalo», «dividi in 4×4 e zooma su B2», «trova la targa e rendila leggibile». Tutti i comandi, anche alla Blade Runner: Comandi, qui sopra, oppure scrivi ?.",
+                                "Write what you want to do, for example: \"enhance F3 and save it\", \"divide into 4×4 and zoom into B2\", \"find the plate and make it readable\". All the commands, Blade Runner style too: Commands, above, or type ?."), CAction);
                     }));
                 }
                 catch { if (bmp != null) bmp.Dispose(); }
@@ -1193,6 +1265,14 @@ Edits: use moderate amounts (10-40) unless the user asks for a strong change, an
             if (Busy || board == null) return;
             string text = input.Text.Trim();
             if (text.Length == 0) return;
+            // «?», «aiuto», «comandi»: la guida dei comandi, senza chiedere all'assistente
+            string word = text.ToLowerInvariant().TrimEnd('.', '!', '?');
+            if (word.Length == 0 || new[] { "aiuto", "comandi", "help", "commands" }.Contains(word))
+            {
+                input.Clear();
+                ShowCommands();
+                return;
+            }
             string missing;
             var provider = AiSettings.Create(out missing);
             if (provider == null)
