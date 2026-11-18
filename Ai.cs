@@ -518,66 +518,94 @@ namespace CorbolImg
         }
     }
 
-    // Finestra delle impostazioni dell'assistente
+    // Finestra delle impostazioni dell'assistente. Dimensioni scalate a mano con S() come nelle altre finestre,
+    // e ogni riga messa sotto la precedente in base all'altezza vera dei testi (che cambia con DPI e lingua).
     class AiSettingsForm : Form
     {
         readonly RadioButton rCode = new RadioButton(), rClaude = new RadioButton(), rOpen = new RadioButton();
         readonly ComboBox cCodeModel = new ComboBox(), cClaudeModel = new ComboBox();
         readonly TextBox tClaudeKey = new TextBox { UseSystemPasswordChar = true }, tUrl = new TextBox(), tKey = new TextBox { UseSystemPasswordChar = true }, tModel = new TextBox();
         readonly CheckBox chImage = new CheckBox();
+        readonly float scale = 1f;
+
+        int S(int v) { return (int)Math.Round(v * scale); }
 
         public AiSettingsForm()
         {
+            AutoScaleMode = AutoScaleMode.None;
+            Font = new Font("Segoe UI", 9f);
+            using (var g = CreateGraphics()) scale = g.DpiX / 96f;
             Text = L.T("Assistente IA", "AI assistant");
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = MinimizeBox = false;
             ShowInTaskbar = false;
             StartPosition = FormStartPosition.CenterParent;
-            AutoScaleDimensions = new SizeF(96f, 96f);
-            AutoScaleMode = AutoScaleMode.Dpi;
-            Font = new Font("Segoe UI", 9f);
             BackColor = Color.White;
-            ClientSize = new Size(480, 470);
 
+            int left = S(20), indent = S(40), field = S(150), width = S(500);
+            int fieldW = width - field - left, shortW = S(220);
             var intro = new Label
             {
-                AutoSize = true, MaximumSize = new Size(440, 0), Location = new Point(20, 14), ForeColor = Color.DimGray,
+                AutoSize = true, MaximumSize = new Size(width - 2 * left, 0), ForeColor = Color.DimGray,
                 Text = L.T("L'assistente legge le tue richieste e comanda Real-ESRGAN (che gira sul PC). Il miglioramento dei riquadri resta locale; all'assistente vanno solo il testo e, se lo permetti, la scacchiera ridotta.",
                            "The assistant reads your requests and drives Real-ESRGAN (which runs on this PC). Enhancing tiles stays local; the assistant only gets your text and, if you allow it, a reduced view of the grid.")
             };
-            int y = 80;
             rCode.Text = L.T("Claude Code (abbonamento Claude, nessuna chiave)", "Claude Code (Claude subscription, no key)");
-            rCode.Location = new Point(20, y); rCode.AutoSize = true;
-            var lCodeModel = new Label { Text = L.T("Modello:", "Model:"), AutoSize = true, Location = new Point(40, y + 30) };
-            cCodeModel.Location = new Point(140, y + 26); cCodeModel.Width = 200;
             cCodeModel.Items.Add(L.T("(predefinito)", "(default)")); cCodeModel.Items.AddRange(ClaudeCodeProvider.Models);
-            y += 64;
             rClaude.Text = L.T("Claude (API Anthropic, con chiave)", "Claude (Anthropic API, with key)");
-            rClaude.Location = new Point(20, y); rClaude.AutoSize = true;
-            var lCk = new Label { Text = L.T("Chiave API:", "API key:"), AutoSize = true, Location = new Point(40, y + 30) };
-            tClaudeKey.Location = new Point(140, y + 26); tClaudeKey.Width = 310;
-            var lCm = new Label { Text = L.T("Modello:", "Model:"), AutoSize = true, Location = new Point(40, y + 60) };
-            cClaudeModel.Location = new Point(140, y + 56); cClaudeModel.Width = 200; cClaudeModel.Items.AddRange(ClaudeProvider.Models);
-            y += 94;
+            cClaudeModel.Items.AddRange(ClaudeProvider.Models);
             rOpen.Text = L.T("Compatibile OpenAI (OpenAI, OpenRouter, Ollama, LM Studio...)", "OpenAI-compatible (OpenAI, OpenRouter, Ollama, LM Studio...)");
-            rOpen.Location = new Point(20, y); rOpen.AutoSize = true;
-            var lU = new Label { Text = L.T("Indirizzo:", "Address:"), AutoSize = true, Location = new Point(40, y + 30) };
-            tUrl.Location = new Point(140, y + 26); tUrl.Width = 310;
-            var lK = new Label { Text = L.T("Chiave API:", "API key:"), AutoSize = true, Location = new Point(40, y + 60) };
-            tKey.Location = new Point(140, y + 56); tKey.Width = 310;
-            var lM = new Label { Text = L.T("Modello:", "Model:"), AutoSize = true, Location = new Point(40, y + 90) };
-            tModel.Location = new Point(140, y + 86); tModel.Width = 200;
-            y += 126;
             chImage.Text = L.T("Mostra all'assistente la scacchiera (immagine ridotta con la griglia)", "Show the assistant the grid (reduced image with the grid)");
-            chImage.Location = new Point(20, y); chImage.AutoSize = true;
+            foreach (var c in new ButtonBase[] { rCode, rClaude, rOpen, chImage }) { c.AutoSize = true; c.MaximumSize = new Size(width - 2 * left, 0); }
+            Controls.Add(intro);
 
-            var ok = new Button { Text = "OK", Size = new Size(90, 30), Location = new Point(ClientSize.Width - 200, ClientSize.Height - 44) };
-            var cancel = new Button { Text = L.T("Annulla", "Cancel"), Size = new Size(90, 30), Location = new Point(ClientSize.Width - 104, ClientSize.Height - 44), DialogResult = DialogResult.Cancel };
+            int y = S(14);
+            intro.Location = new Point(left, y);
+            y += intro.PreferredSize.Height + S(14);
+
+            // Una voce a scelta, poi le sue righe "etichetta: campo" rientrate
+            Func<RadioButton, int> option = rb =>
+            {
+                rb.Location = new Point(left, y);
+                Controls.Add(rb);
+                return y += rb.PreferredSize.Height + S(6);
+            };
+            Action<string, Control, int> row = (label, ctl, w) =>
+            {
+                ctl.Location = new Point(field, y);
+                ctl.Width = w;
+                var l = new Label { Text = label, AutoSize = true };
+                Controls.Add(ctl);
+                Controls.Add(l);
+                l.Location = new Point(indent, y + (ctl.PreferredSize.Height - l.PreferredSize.Height) / 2);
+                y += Math.Max(ctl.PreferredSize.Height, l.PreferredSize.Height) + S(6);
+            };
+
+            option(rCode);
+            row(L.T("Modello:", "Model:"), cCodeModel, shortW);
+            y += S(10);
+            option(rClaude);
+            row(L.T("Chiave API:", "API key:"), tClaudeKey, fieldW);
+            row(L.T("Modello:", "Model:"), cClaudeModel, shortW);
+            y += S(10);
+            option(rOpen);
+            row(L.T("Indirizzo:", "Address:"), tUrl, fieldW);
+            row(L.T("Chiave API:", "API key:"), tKey, fieldW);
+            row(L.T("Modello:", "Model:"), tModel, shortW);
+            y += S(12);
+            chImage.Location = new Point(left, y);
+            Controls.Add(chImage);
+            y += chImage.PreferredSize.Height + S(20);
+
+            var ok = new Button { Text = "OK", Size = new Size(S(90), S(30)) };
+            var cancel = new Button { Text = L.T("Annulla", "Cancel"), Size = new Size(S(90), S(30)), DialogResult = DialogResult.Cancel };
+            ok.Location = new Point(width - left - S(90) - S(8) - S(90), y);
+            cancel.Location = new Point(width - left - S(90), y);
             ok.Click += delegate { SaveAll(); DialogResult = DialogResult.OK; Close(); };
             cancel.Click += delegate { Close(); };
             AcceptButton = ok; CancelButton = cancel;
-            Controls.AddRange(new Control[] { intro, rCode, lCodeModel, cCodeModel, rClaude, lCk, tClaudeKey, lCm, cClaudeModel,
-                                              rOpen, lU, tUrl, lK, tKey, lM, tModel, chImage, ok, cancel });
+            Controls.Add(ok); Controls.Add(cancel);
+            ClientSize = new Size(width, y + S(30) + S(14));
 
             string p = AiSettings.Provider;
             rCode.Checked = p == AiSettings.ClaudeCode; rClaude.Checked = p == AiSettings.Claude; rOpen.Checked = p == AiSettings.OpenAi;
