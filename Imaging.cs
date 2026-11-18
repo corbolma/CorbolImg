@@ -766,4 +766,111 @@ namespace CorbolImg
             return r;
         }
     }
+
+    // Immagini dagli appunti di Windows: file copiati in Esplora file, oppure un'immagine copiata da un
+    // programma (cattura dello schermo, browser, Paint...), che viene salvata come PNG in una cartella
+    // temporanea (%LOCALAPPDATA%\CorbolImg\Appunti), svuotata dei file vecchi a ogni avvio. Per tenerla si usa
+    // Salva come; quello che si salva o si converte partendo da lì va in Immagini.
+    static class ClipboardImages
+    {
+        public const int KeepDays = 7;
+
+        public static string Dir
+        {
+            get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CorbolImg", "Appunti"); }
+        }
+
+        public static bool IsPasted(string path)
+        {
+            try { return string.Equals(Path.GetDirectoryName(Path.GetFullPath(path)), Dir,StringComparison.OrdinalIgnoreCase); }
+            catch { return false; }
+        }
+
+        // Cartella in cui salvare ciò che si ricava da un file: la sua, o Immagini se è un'immagine incollata
+        public static string SaveDir(string path)
+        {
+            return IsPasted(path) ? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures) : Path.GetDirectoryName(path);
+        }
+
+        // All'avvio: cancella le immagini incollate più vecchie di KeepDays giorni
+        public static void Cleanup()
+        {
+            try
+            {
+                if (!Directory.Exists(Dir)) return;
+                var limit = DateTime.Now.AddDays(-KeepDays);
+                foreach (var f in Directory.GetFiles(Dir))
+                    try { if (File.GetLastWriteTime(f) < limit) File.Delete(f); } catch { }
+            }
+            catch { }
+        }
+
+        public static bool Available()
+        {
+            try
+            {
+                var c = System.Windows.Forms.Clipboard.GetDataObject();
+                return c != null && (FromFiles(c).Count > 0 || c.GetDataPresent("PNG") || c.GetDataPresent(System.Windows.Forms.DataFormats.Bitmap)
+                                     || c.GetDataPresent(System.Windows.Forms.DataFormats.Dib));
+            }
+            catch { return false; }
+        }
+
+        // Percorsi da aprire o aggiungere (vuoto se negli appunti non c'è un'immagine); saved è il file PNG creato,
+        // se l'immagine non era un file. Lancia un'eccezione se l'immagine non si può salvare.
+        public static List<string> Get(out string saved)
+        {
+            System.Windows.Forms.IDataObject c = null;
+            try { c = System.Windows.Forms.Clipboard.GetDataObject(); } catch { }
+            return Get(c, Dir, out saved);
+        }
+
+        public static List<string> Get(System.Windows.Forms.IDataObject c, string dir, out string saved)
+        {
+            saved = null;
+            if (c == null) return new List<string>();
+            var files = FromFiles(c);
+            if (files.Count > 0) return files;
+
+            byte[] png = null;
+            try
+            {
+                var ms = c.GetData("PNG") as MemoryStream; // conserva la trasparenza (browser, Strumento di cattura...)
+                if (ms != null && ms.Length > 8) png = ms.ToArray();
+                if (png != null && !(png[0] == 0x89 && png[1] == 'P' && png[2] == 'N' && png[3] == 'G')) png = null;
+            }
+            catch { }
+            if (png == null)
+            {
+                Gdi.Image img = null;
+                try { img = c.GetData(System.Windows.Forms.DataFormats.Bitmap, true) as Gdi.Image; } catch { } // anche da DIB
+                if (img == null) return new List<string>();
+                using (img)
+                using (var ms = new MemoryStream())
+                {
+                    img.Save(ms, GdiImaging.ImageFormat.Png);
+                    png = ms.ToArray();
+                }
+            }
+            Directory.CreateDirectory(dir);
+            string name = L.T("Appunti", "Clipboard") + " " + DateTime.Now.ToString("yyyy-MM-dd HH.mm.ss", CultureInfo.InvariantCulture);
+            string path = Path.Combine(dir, name + ".png");
+            for (int i = 2; File.Exists(path); i++) path = Path.Combine(dir, name + " (" + i + ").png");
+            File.WriteAllBytes(path, png);
+            saved = path;
+            return new List<string> { path };
+        }
+
+        static List<string> FromFiles(System.Windows.Forms.IDataObject c)
+        {
+            var l = new List<string>();
+            try
+            {
+                var a = c.GetData(System.Windows.Forms.DataFormats.FileDrop) as string[];
+                if (a != null) l.AddRange(a.Where(p => Directory.Exists(p) || (File.Exists(p) && Imaging.IsImageExt(p))));
+            }
+            catch { }
+            return l;
+        }
+    }
 }

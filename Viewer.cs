@@ -485,13 +485,13 @@ namespace CorbolImg
         readonly ToolStripSplitButton bConvert = new ToolStripSplitButton();
         readonly ToolStripDropDownButton bMore = new ToolStripDropDownButton();
         readonly ToolStripMenuItem cvThis = new ToolStripMenuItem(), cvFolder = new ToolStripMenuItem(), cvOpen = new ToolStripMenuItem();
-        readonly ToolStripMenuItem mUpdAvail = new ToolStripMenuItem(), mFolder = new ToolStripMenuItem(), mCopy = new ToolStripMenuItem(),
+        readonly ToolStripMenuItem mUpdAvail = new ToolStripMenuItem(), mFolder = new ToolStripMenuItem(), mCopy = new ToolStripMenuItem(), mPaste = new ToolStripMenuItem(),
             mSlideshow = new ToolStripMenuItem(), mDefault = new ToolStripMenuItem(), mLang = new ToolStripMenuItem(), mCheckUpd = new ToolStripMenuItem(),
             mAutoUpd = new ToolStripMenuItem(), mSite = new ToolStripMenuItem(), mAbout = new ToolStripMenuItem();
         readonly List<ToolStripMenuItem> miLang = new List<ToolStripMenuItem>();
         // Menu del tasto destro
         readonly ContextMenuStrip ctx = new ContextMenuStrip();
-        readonly ToolStripMenuItem cSave = new ToolStripMenuItem(), cConvert = new ToolStripMenuItem(), cCopy = new ToolStripMenuItem(),
+        readonly ToolStripMenuItem cSave = new ToolStripMenuItem(), cConvert = new ToolStripMenuItem(), cCopy = new ToolStripMenuItem(), cPaste = new ToolStripMenuItem(),
             cFolder = new ToolStripMenuItem(), cRotL = new ToolStripMenuItem(), cRotR = new ToolStripMenuItem(), cDelete = new ToolStripMenuItem(),
             cInfo = new ToolStripMenuItem(), cFull = new ToolStripMenuItem(), cGrid = new ToolStripMenuItem();
         // Immagine, informazioni, barra di stato
@@ -661,12 +661,14 @@ namespace CorbolImg
             mUpdAvail.Font = new Font(mUpdAvail.Font, FontStyle.Bold);
             Glyph(mFolder, Glyphs.Folder); Glyph(mCopy, Glyphs.Copy); Glyph(mSlideshow, Glyphs.Slideshow);
             mCopy.ShortcutKeyDisplayString = "Ctrl+C";
+            mPaste.ShortcutKeyDisplayString = "Ctrl+V";
             mSlideshow.ShortcutKeyDisplayString = "F5";
             bMore.DropDownItems.AddRange(new ToolStripItem[]
             {
                 Mi(mUpdAvail, delegate { Updater.Offer(this); }),
                 Mi(mFolder, delegate { if (Current != null) Util.SelectInExplorer(Current); }),
                 Mi(mCopy, delegate { CopyCurrent(); }),
+                Mi(mPaste, delegate { Paste(); }),
                 Mi(mSlideshow, delegate { StartSlideshow(); }),
                 new ToolStripSeparator(),
                 Mi(mDefault, delegate { SetAsDefault(); }),
@@ -682,6 +684,7 @@ namespace CorbolImg
                 mAutoUpd.Checked = Settings.Get("autoUpdate", false);
                 foreach (var m in miLang) m.Checked = (string)m.Tag == L.Setting;
                 mFolder.Enabled = mCopy.Enabled = Current != null;
+                mPaste.Enabled = ClipboardImages.Available();
                 mSlideshow.Enabled = files.Count > 1;
             };
 
@@ -701,6 +704,7 @@ namespace CorbolImg
             cSave.ShortcutKeyDisplayString = "Ctrl+S";
             cConvert.ShortcutKeyDisplayString = "Ctrl+E";
             cCopy.ShortcutKeyDisplayString = "Ctrl+C";
+            cPaste.ShortcutKeyDisplayString = "Ctrl+V";
             cRotL.ShortcutKeyDisplayString = "Shift+R";
             cRotR.ShortcutKeyDisplayString = "R";
             cDelete.ShortcutKeyDisplayString = "Canc";
@@ -712,6 +716,7 @@ namespace CorbolImg
                 Mi(cConvert, delegate { ConvertThis(); }),
                 Mi(cGrid, delegate { OpenGrid(); }),
                 Mi(cCopy, delegate { CopyCurrent(); }),
+                Mi(cPaste, delegate { Paste(); }),
                 Mi(cFolder, delegate { if (Current != null) Util.SelectInExplorer(Current); }),
                 new ToolStripSeparator(),
                 Mi(cRotL, delegate { Rotate(-1); }),
@@ -726,6 +731,7 @@ namespace CorbolImg
             {
                 bool has = Current != null;
                 foreach (var m in new[] { cSave, cConvert, cCopy, cFolder, cRotL, cRotR, cDelete, cGrid }) m.Enabled = has;
+                cPaste.Enabled = ClipboardImages.Available();
                 cInfo.Checked = infoPanel.Visible;
                 cFull.Checked = fullScreen;
             };
@@ -796,6 +802,7 @@ namespace CorbolImg
             if (Updater.Version != null) mUpdAvail.Text = L.F("Aggiorna a CorbolImg {0}...", "Update to CorbolImg {0}...", Updater.Version);
             mFolder.Text = L.T("Mostra in Esplora file", "Show in File Explorer");
             mCopy.Text = L.T("Copia", "Copy");
+            mPaste.Text = L.T("Incolla", "Paste");
             mSlideshow.Text = L.T("Presentazione", "Slideshow");
             mDefault.Text = L.T("Imposta come visualizzatore predefinito...", "Set as default image viewer...");
             mLang.Text = "Lingua / Language";
@@ -808,6 +815,7 @@ namespace CorbolImg
             cSave.Text = L.T("Salva come...", "Save as...");
             cConvert.Text = L.T("Converti...", "Convert...");
             cCopy.Text = L.T("Copia", "Copy");
+            cPaste.Text = L.T("Incolla", "Paste");
             cFolder.Text = L.T("Mostra in Esplora file", "Show in File Explorer");
             cRotL.Text = L.T("Ruota a sinistra", "Rotate left");
             cRotR.Text = L.T("Ruota a destra", "Rotate right");
@@ -954,7 +962,7 @@ namespace CorbolImg
             {
                 canvas.SetImage(null, false, false);
                 canvas.Message = folder != null ? L.T("Nessuna immagine in questa cartella.", "No images in this folder.")
-                                                : L.T("Apri un'immagine (Ctrl+O) o trascinala qui", "Open an image (Ctrl+O) or drag it here");
+                                                : L.T("Apri un'immagine (Ctrl+O), incollala (Ctrl+V) o trascinala qui", "Open an image (Ctrl+O), paste it (Ctrl+V) or drag it here");
                 canvas.Invalidate();
                 Text = "CorbolImg";
                 cache.Want(new List<string>());
@@ -1219,6 +1227,26 @@ namespace CorbolImg
             catch { }
         }
 
+        // Incolla dagli appunti: file copiati in Esplora file, o un'immagine copiata da un programma, che viene
+        // salvata come PNG nella cartella temporanea delle immagini incollate e aperta.
+        void Paste()
+        {
+            List<string> paths;
+            string saved;
+            try { paths = ClipboardImages.Get(out saved); }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, L.T("Impossibile salvare l'immagine degli appunti:", "Could not save the clipboard image:") + "\n" + ex.Message,
+                                "CorbolImg", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (paths.Count == 0) { ShowFlash(L.T("Negli appunti non c'è un'immagine.", "There is no image on the clipboard.")); return; }
+            StopSlideshow();
+            OpenPaths(paths);
+            if (saved != null) ShowFlash(L.F("Immagine incollata dagli appunti: per tenerla usa Salva come (Ctrl+S). Le immagini incollate si cancellano dopo {0} giorni.",
+                                             "Image pasted from the clipboard: to keep it use Save as (Ctrl+S). Pasted images are deleted after {0} days.", ClipboardImages.KeepDays));
+        }
+
         // Griglia IA sull'immagine mostrata (con la rotazione non ancora salvata)
         void OpenGrid()
         {
@@ -1257,7 +1285,7 @@ namespace CorbolImg
                 Filter = string.Join("|", outs.Select(o => o.Name + " (*" + o.Ext + ")|*" + o.Ext)),
                 AddExtension = true,
                 OverwritePrompt = true,
-                InitialDirectory = Path.GetDirectoryName(p),
+                InitialDirectory = ClipboardImages.SaveDir(p),
                 FileName = Path.GetFileNameWithoutExtension(p)
             })
             {
@@ -1406,6 +1434,7 @@ namespace CorbolImg
                 case Keys.Control | Keys.O: OpenDialog(); return true;
                 case Keys.Control | Keys.S: case Keys.Control | Keys.Shift | Keys.S: SaveAs(); return true;
                 case Keys.Control | Keys.C: CopyCurrent(); return true;
+                case Keys.Control | Keys.V: case Keys.Shift | Keys.Insert: Paste(); return true;
                 case Keys.Control | Keys.E: ConvertThis(); return true;
                 case Keys.G: OpenGrid(); return true;
                 case Keys.Control | Keys.W: Close(); return true;

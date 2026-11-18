@@ -344,8 +344,8 @@ namespace CorbolImg
             chBytes.Text = L.T("Peso", "Size");
             chEst.Text = L.T("Previsto", "Estimated");
             chState.Text = L.T("Stato", "Status");
-            dropHint.Text = L.T("Trascina qui immagini o cartelle\noppure clicca per sceglierle",
-                                "Drag images or folders here\nor click to choose them");
+            dropHint.Text = L.T("Trascina qui immagini o cartelle, incollale (Ctrl+V)\noppure clicca per sceglierle",
+                                "Drag images or folders here, paste them (Ctrl+V)\nor click to choose them");
             cmOpen.Text = L.T("Apri", "Open");
             cmFolder.Text = L.T("Apri cartella", "Open folder");
             cmRemove.Text = L.T("Rimuovi dall'elenco", "Remove from list");
@@ -560,11 +560,28 @@ namespace CorbolImg
                 e.Handled = true;
             }
             else if (e.KeyCode == Keys.O && e.Control) { AddFilesDialog(); e.Handled = true; }
-            else if (e.KeyCode == Keys.V && e.Control && !(ActiveControl is TextBox) && !(ActiveControl is NumericUpDown) && Clipboard.ContainsFileDropList())
+            else if (((e.KeyCode == Keys.V && e.Control) || (e.KeyCode == Keys.Insert && e.Shift)) && !(ActiveControl is TextBox) && !(ActiveControl is NumericUpDown))
             {
-                AddPaths(Clipboard.GetFileDropList().Cast<string>());
+                PasteImages();
                 e.Handled = true;
             }
+        }
+
+        // Ctrl+V: file copiati in Esplora file, o un'immagine copiata da un programma (salvata come PNG tra le immagini incollate)
+        void PasteImages()
+        {
+            if (converting) return;
+            List<string> paths;
+            string saved;
+            try { paths = ClipboardImages.Get(out saved); }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, L.T("Impossibile salvare l'immagine degli appunti:", "Could not save the clipboard image:") + "\n" + ex.Message,
+                                "CorbolImg", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (paths.Count == 0) { System.Media.SystemSounds.Beep.Play(); return; }
+            AddPaths(paths);
         }
 
         void AddFilesDialog()
@@ -1051,7 +1068,7 @@ namespace CorbolImg
         // Percorso del file convertito: mai l'originale e mai lo stesso file due volte nella stessa conversione.
         static string DestPath(string src, string outDir, string ext, bool overwrite, HashSet<string> produced)
         {
-            string dir = outDir ?? Path.GetDirectoryName(src);
+            string dir = outDir ?? ClipboardImages.SaveDir(src); // le immagini incollate dagli appunti: in Immagini
             string name = Path.GetFileNameWithoutExtension(src);
             string dest = Path.Combine(dir, name + ext);
             Func<string, bool> taken = p =>

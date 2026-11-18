@@ -1108,7 +1108,7 @@ Edits: use moderate amounts (10-40) unless the user asks for a strong change, an
                 Filter = string.Join("|", outs.Select(o => o.Name + " (*" + o.Ext + ")|*" + o.Ext)),
                 AddExtension = true,
                 OverwritePrompt = true,
-                InitialDirectory = Path.GetDirectoryName(sourcePath),
+                InitialDirectory = ClipboardImages.SaveDir(sourcePath),
             })
             {
                 d.FileName = BaseName + Suffix(c, r);
@@ -1131,7 +1131,7 @@ Edits: use moderate amounts (10-40) unless the user asks for a strong change, an
             var f = outs.FirstOrDefault(o => o.Id == (format ?? "").ToLowerInvariant().Replace("jpeg", "jpg")) ?? outs[0];
             string suffix;
             var bmp = Pixels(c, r, out suffix);
-            string dir = Path.GetDirectoryName(sourcePath);
+            string dir = ClipboardImages.SaveDir(sourcePath);
             if (!CanWrite(dir)) dir = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
             string dest = Path.Combine(dir, BaseName + suffix + f.Ext);
             for (int i = 2; File.Exists(dest); i++) dest = Path.Combine(dir, BaseName + suffix + " (" + i + ")" + f.Ext);

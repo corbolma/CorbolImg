@@ -39,6 +39,7 @@ namespace CorbolImg
         {
             try { SetProcessDPIAware(); } catch { }
             OldApp.MoveLeftovers(); // dati rimasti nelle cartelle col nome vecchio (AppImg)
+            ClipboardImages.Cleanup(); // immagini incollate dagli appunti più vecchie di una settimana
             try { SetCurrentProcessExplicitAppUserModelID(AppUserModelId); } catch { }
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);

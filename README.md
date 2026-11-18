@@ -29,6 +29,7 @@
 - **Pannello informazioni** (I): formato, dimensioni, peso, data dello scatto, fotocamera, esposizione (diaframma, tempo, ISO, focale) e posizione GPS con link alla mappa.
 - **GIF animate** riprodotte, **trasparenza** mostrata su sfondo a scacchi, **foto dritte** secondo l'orientamento EXIF del telefono.
 - **Copia** (Ctrl+C) l'immagine per incollarla in un altro programma o il file in Esplora file; **Sposta nel Cestino** (Canc).
+- **Incolla** (Ctrl+V) un'immagine dagli appunti: file copiati in Esplora file, oppure un'immagine copiata da un altro programma (cattura dello schermo, browser, Paint...), che viene aperta come PNG temporaneo: per tenerla usa **Salva come** (Ctrl+S), altrimenti viene cancellata dopo 7 giorni. Funziona anche nel convertitore, per aggiungerla all'elenco; i file convertiti da un'immagine incollata vanno in *Immagini* se non scegli un'altra cartella.
 - Le immagini vicine vengono preparate in anticipo, così il passaggio da una all'altra è immediato.
 
 ### Convertitore
@@ -65,7 +66,7 @@ CorbolImg usa i codec di Windows: legge BMP, PNG, JPEG, GIF, TIFF, ICO, JPEG XR 
 | R · Shift+R | ruota a destra / sinistra | Canc | sposta nel Cestino |
 | F11 · F · Esc | schermo intero | I | informazioni |
 | F5 | presentazione | Ctrl+W | chiudi |
-| G | griglia IA | | |
+| G | griglia IA | Ctrl+V | incolla dagli appunti |
 
 ### Installazione
 1. Scarica `CorbolImg-Setup-X.Y.Z.exe` dalle [Releases](https://github.com/corbolma/CorbolImg/releases/latest).
@@ -104,6 +105,7 @@ CorbolImg non raccoglie dati e lavora solo sul tuo PC: le immagini non vengono m
 - **Information panel** (I): format, dimensions, file size, date taken, camera, exposure (aperture, shutter, ISO, focal length) and GPS location with a map link.
 - **Animated GIFs** play, **transparency** is shown on a checkerboard, **phone photos are upright** according to their EXIF orientation.
 - **Copy** (Ctrl+C) the image to paste it into another program, or the file into File Explorer; **Move to Recycle Bin** (Del).
+- **Paste** (Ctrl+V) an image from the clipboard: files copied in File Explorer, or an image copied from another program (screenshot, browser, Paint...), which opens as a temporary PNG: to keep it use **Save as** (Ctrl+S), otherwise it is deleted after 7 days. It also works in the converter, to add it to the list; files converted from a pasted image go to *Pictures* unless you choose another folder.
 - Nearby images are prepared in advance, so switching between them is instant.
 
 ### Converter
@@ -138,7 +140,7 @@ CorbolImg uses the Windows codecs: it reads BMP, PNG, JPEG, GIF, TIFF, ICO, JPEG
 | R · Shift+R | rotate right / left | Del | move to Recycle Bin |
 | F11 · F · Esc | full screen | I | information |
 | F5 | slideshow | Ctrl+W | close |
-| G | AI grid | | |
+| G | AI grid | Ctrl+V | paste from the clipboard |
 
 ### Installation
 1. Download `CorbolImg-Setup-X.Y.Z.exe` from [Releases](https://github.com/corbolma/CorbolImg/releases/latest).
