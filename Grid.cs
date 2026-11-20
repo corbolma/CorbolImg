@@ -1295,7 +1295,7 @@ After entering a cell this way, also select the cell of the new board that best 
             cts = new CancellationTokenSource();
             var token = cts.Token;
             aiRunning = true;
-            SetStatus(L.F("{0} sta pensando...", "{0} is thinking...", provider.Name));
+            SetStatus(L.F("{0} sta pensando...", "{0} is thinking...", ClaudeCodeProvider.DisplayNameOf(provider)));
             UpdateUi();
             ThreadPool.QueueUserWorkItem(delegate
             {

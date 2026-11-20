@@ -314,6 +314,105 @@ namespace CorbolImg
     {
         public static readonly string[] Models = { "opus", "sonnet", "haiku" };
         public string Model = "";   // vuoto = il modello predefinito di Claude Code per l'account
+        // Cartella di configurazione di Claude Code (CLAUDE_CONFIG_DIR), cioè l'account con cui gira:
+        // vuoto = quella predefinita (%USERPROFILE%\.claude), o quella già impostata nell'ambiente
+        public string ConfigDir = "";
+
+        // Nome da mostrare nell'app, con l'account (email) con cui gira Claude Code.
+        // Non va nei testi che possono finire in segnalazioni o rapporti: lì resta Name.
+        public string DisplayName { get { return Name + " · " + (EmailOf(ConfigDir ?? "") ?? L.T("login non fatto", "not logged in")); } }
+        public static string DisplayNameOf(IAiProvider p) { var c = p as ClaudeCodeProvider; return c != null ? c.DisplayName : p == null ? "" : p.Name; }
+        public static string AccountEmail(string dir) { return EmailOf(dir ?? ""); }
+
+        // ---------- account (una cartella di configurazione per ogni login) ----------
+
+        static string Home { get { return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile); } }
+
+        public class Account
+        {
+            public string Dir;      // "" = predefinito
+            public string Email;    // null = login non ancora fatto
+            public string Label
+            {
+                get
+                {
+                    string who = Email ?? L.T("login non fatto", "not logged in");
+                    return Dir.Length == 0 ? L.F("Predefinito ({0})", "Default ({0})", who) : who + "  ·  " + Path.GetFileName(Dir.TrimEnd('\\'));
+                }
+            }
+        }
+
+        static readonly Dictionary<string, KeyValuePair<DateTime, string>> emailCache = new Dictionary<string, KeyValuePair<DateTime, string>>(StringComparer.OrdinalIgnoreCase);
+
+        // Email dell'account registrato in una cartella di configurazione, o null
+        static string EmailOf(string dir)
+        {
+            try
+            {
+                // predefinito: %USERPROFILE%\.claude.json; con CLAUDE_CONFIG_DIR: <cartella>\.claude.json
+                string env = Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR");
+                string f = dir.Length > 0 ? Path.Combine(dir, ".claude.json")
+                         : !string.IsNullOrEmpty(env) ? Path.Combine(env, ".claude.json") : Path.Combine(Home, ".claude.json");
+                if (!File.Exists(f)) return null;
+                // .claude.json può essere grande: si rilegge solo quando cambia
+                var t = File.GetLastWriteTimeUtc(f);
+                lock (emailCache)
+                {
+                    KeyValuePair<DateTime, string> c;
+                    if (emailCache.TryGetValue(f, out c) && c.Key == t) return c.Value;
+                }
+                string email = AiJson.Str(AiJson.Parse(File.ReadAllText(f, Encoding.UTF8)), "oauthAccount", "emailAddress");
+                lock (emailCache) emailCache[f] = new KeyValuePair<DateTime, string>(t, email);
+                return email;
+            }
+            catch { return null; }
+        }
+
+        // Il predefinito più le cartelle %USERPROFILE%\.claude-* (create con AddAccount o a mano)
+        public static List<Account> Accounts()
+        {
+            var list = new List<Account> { new Account { Dir = "", Email = EmailOf("") } };
+            try
+            {
+                foreach (var d in Directory.GetDirectories(Home, ".claude-*").OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
+                    list.Add(new Account { Dir = d, Email = EmailOf(d) });
+            }
+            catch { }
+            return list;
+        }
+
+        // Crea la cartella %USERPROFILE%\.claude-<nome> e apre Claude Code in una finestra per fare il login
+        // con l'altro account. Restituisce la cartella, o null con l'errore in error.
+        public static string AddAccount(string name, out string error)
+        {
+            error = null;
+            name = new string((name ?? "").Trim().ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
+            if (name.Length == 0) { error = L.T("Scrivi un nome per l'account (es. lavoro).", "Enter a name for the account (e.g. work)."); return null; }
+            string exe = FindExe();
+            if (exe == null) { error = L.T("Claude Code non è installato su questo PC.", "Claude Code is not installed on this PC."); return null; }
+            string dir = Path.Combine(Home, ".claude-" + name);
+            try
+            {
+                Directory.CreateDirectory(dir);
+                OpenLogin(exe, dir);
+                return dir;
+            }
+            catch (Exception ex) { error = ex.Message; return null; }
+        }
+
+        // Finestra del prompt dei comandi con Claude Code sull'account della cartella: al primo avvio chiede il login
+        public static void OpenLogin(string exe, string dir)
+        {
+            var psi = new ProcessStartInfo("cmd.exe", "/k \"\"" + exe + "\"\"")
+            {
+                UseShellExecute = false,
+                WorkingDirectory = Home
+            };
+            psi.EnvironmentVariables.Remove("CLAUDECODE");
+            psi.EnvironmentVariables.Remove("CLAUDE_CODE_ENTRYPOINT");
+            if (dir.Length > 0) psi.EnvironmentVariables["CLAUDE_CONFIG_DIR"] = dir;
+            Process.Start(psi);
+        }
         public string Name { get { return "Claude Code"; } }
 
         // claude.exe (installazione nativa) o claude.cmd (installazione con npm), o null
@@ -398,6 +497,8 @@ namespace CorbolImg
                 // se CorbolImg è stato avviato da una sessione di Claude Code, quella nuova deve essere indipendente
                 psi.EnvironmentVariables.Remove("CLAUDECODE");
                 psi.EnvironmentVariables.Remove("CLAUDE_CODE_ENTRYPOINT");
+                // l'account scelto nelle impostazioni (altrimenti quello predefinito di Claude Code)
+                if (!string.IsNullOrEmpty(ConfigDir)) psi.EnvironmentVariables["CLAUDE_CONFIG_DIR"] = ConfigDir;
                 p = Process.Start(psi);
                 var proc = p;
                 p.ErrorDataReceived += (s, e) => { if (e.Data != null) lock (err) err.AppendLine(e.Data); };
@@ -484,6 +585,8 @@ namespace CorbolImg
         public static string ClaudeKey { get { return Secret.Unprotect(Settings.Get("ai.claude.key", "")); } set { Settings.Set("ai.claude.key", Secret.Protect(value)); } }
         public static string ClaudeModel { get { return Settings.Get("ai.claude.model", ClaudeProvider.DefaultModel); } set { Settings.Set("ai.claude.model", value); } }
         public static string ClaudeCodeModel { get { return Settings.Get("ai.claudecode.model", ""); } set { Settings.Set("ai.claudecode.model", value); } }
+        // Claude Code: account da usare = cartella di configurazione (CLAUDE_CONFIG_DIR); vuoto = predefinito
+        public static string ClaudeCodeConfig { get { return Settings.Get("ai.claudecode.config", ""); } set { Settings.Set("ai.claudecode.config", value); } }
         public static string OpenAiUrl { get { return Settings.Get("ai.openai.url", "https://api.openai.com/v1"); } set { Settings.Set("ai.openai.url", value); } }
         public static string OpenAiKey { get { return Secret.Unprotect(Settings.Get("ai.openai.key", "")); } set { Settings.Set("ai.openai.key", Secret.Protect(value)); } }
         public static string OpenAiModel { get { return Settings.Get("ai.openai.model", ""); } set { Settings.Set("ai.openai.model", value); } }
@@ -507,14 +610,14 @@ namespace CorbolImg
                 missing = L.T("Manca l'indirizzo o il modello del servizio compatibile OpenAI.", "The OpenAI-compatible service address or model is missing.");
                 return null;
             }
-            return new ClaudeCodeProvider { Model = ClaudeCodeModel };
+            return new ClaudeCodeProvider { Model = ClaudeCodeModel, ConfigDir = ClaudeCodeConfig };
         }
 
         public static string Describe()
         {
             if (Provider == Claude) return "Claude API · " + ClaudeModel;
             if (Provider == OpenAi) return (OpenAiModel.Length > 0 ? OpenAiModel : "OpenAI") + " · " + OpenAiUrl;
-            return "Claude Code" + (ClaudeCodeModel.Length > 0 ? " · " + ClaudeCodeModel : "");
+            return "Claude Code" + (ClaudeCodeModel.Length > 0 ? " · " + ClaudeCodeModel : "") + " · " + (ClaudeCodeProvider.AccountEmail(ClaudeCodeConfig) ?? L.T("login non fatto", "not logged in"));
         }
     }
 
@@ -524,6 +627,10 @@ namespace CorbolImg
     {
         readonly RadioButton rCode = new RadioButton(), rClaude = new RadioButton(), rOpen = new RadioButton();
         readonly ComboBox cCodeModel = new ComboBox(), cClaudeModel = new ComboBox();
+        readonly ComboBox cCodeAccount = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
+        readonly List<string> accountDirs = new List<string>();   // cartella di ogni voce di cCodeAccount ("" = predefinito)
+        readonly Label lAccount = new Label { AutoSize = false, ForeColor = Color.DimGray };
+        static readonly Color ErrColor = Color.Firebrick;
         readonly TextBox tClaudeKey = new TextBox { UseSystemPasswordChar = true }, tUrl = new TextBox(), tKey = new TextBox { UseSystemPasswordChar = true }, tModel = new TextBox();
         readonly CheckBox chImage = new CheckBox();
         readonly float scale = 1f;
@@ -583,6 +690,18 @@ namespace CorbolImg
 
             option(rCode);
             row(L.T("Modello:", "Model:"), cCodeModel, shortW);
+            // account: uno per ogni login di Claude Code
+            cCodeAccount.DropDown += delegate { FillAccounts(SelectedAccount()); };   // dopo il login nella finestra compare l'email
+            row(L.T("Account:", "Account:"), cCodeAccount, fieldW);
+            var btAddAcc = new Button { Text = L.T("Aggiungi...", "Add..."), Location = new Point(field, y), Size = new Size(S(110), S(26)) };
+            var btLoginAcc = new Button { Text = L.T("Accedi di nuovo...", "Log in again..."), Location = new Point(field + S(118), y), Size = new Size(S(150), S(26)) };
+            btAddAcc.Click += delegate { AddAccount(); };
+            btLoginAcc.Click += delegate { LoginAgain(); };
+            Controls.Add(btAddAcc); Controls.Add(btLoginAcc);
+            y += S(32);
+            lAccount.Location = new Point(field, y); lAccount.Size = new Size(fieldW, S(34));
+            Controls.Add(lAccount);
+            y += S(36);
             y += S(10);
             option(rClaude);
             row(L.T("Chiave API:", "API key:"), tClaudeKey, fieldW);
@@ -611,16 +730,87 @@ namespace CorbolImg
             rCode.Checked = p == AiSettings.ClaudeCode; rClaude.Checked = p == AiSettings.Claude; rOpen.Checked = p == AiSettings.OpenAi;
             string cm = AiSettings.ClaudeCodeModel;
             if (cm.Length == 0) cCodeModel.SelectedIndex = 0; else cCodeModel.Text = cm;
+            FillAccounts(AiSettings.ClaudeCodeConfig);
             tClaudeKey.Text = AiSettings.ClaudeKey;
             cClaudeModel.Text = AiSettings.ClaudeModel;
             tUrl.Text = AiSettings.OpenAiUrl; tKey.Text = AiSettings.OpenAiKey; tModel.Text = AiSettings.OpenAiModel;
             chImage.Checked = AiSettings.SendImage;
         }
 
+        // ---------- account di Claude Code (uno per ogni login, ognuno nella sua cartella di configurazione) ----------
+
+        string SelectedAccount()
+        {
+            int i = cCodeAccount.SelectedIndex;
+            return i >= 0 && i < accountDirs.Count ? accountDirs[i] : "";
+        }
+
+        void FillAccounts(string select)
+        {
+            cCodeAccount.Items.Clear();
+            accountDirs.Clear();
+            foreach (var a in ClaudeCodeProvider.Accounts()) { cCodeAccount.Items.Add(a.Label); accountDirs.Add(a.Dir); }
+            int i = accountDirs.FindIndex(x => string.Equals(x, select ?? "", StringComparison.OrdinalIgnoreCase));
+            if (i < 0 && !string.IsNullOrEmpty(select))
+            {
+                // cartella salvata che non è più tra quelle trovate: si mostra lo stesso
+                cCodeAccount.Items.Add(select); accountDirs.Add(select);
+                i = accountDirs.Count - 1;
+            }
+            cCodeAccount.SelectedIndex = Math.Max(0, i);
+        }
+
+        void AccountNote(string text, bool error)
+        {
+            lAccount.Text = text;
+            lAccount.ForeColor = error ? ErrColor : Color.DimGray;
+        }
+
+        // Chiede un nome, crea la cartella e apre Claude Code per il login con l'altro account
+        void AddAccount()
+        {
+            string name = Prompt(L.T("Nome del nuovo account (es. lavoro). Si apre Claude Code in una finestra: fai il login con l'altra utenza, poi chiudi la finestra.",
+                                     "Name of the new account (e.g. work). Claude Code opens in a window: log in with the other account, then close the window."));
+            if (name == null) return;
+            string err;
+            string dir = ClaudeCodeProvider.AddAccount(name, out err);
+            if (dir == null) { AccountNote(err, true); return; }
+            FillAccounts(dir);
+            AccountNote(L.T("Fai il login nella finestra di Claude Code; poi riapri l'elenco Account per vedere l'email.",
+                            "Log in in the Claude Code window; then reopen the Account list to see the email."), false);
+        }
+
+        void LoginAgain()
+        {
+            string exe = ClaudeCodeProvider.FindExe();
+            if (exe == null) { AccountNote(L.T("Claude Code non è installato su questo PC.", "Claude Code is not installed on this PC."), true); return; }
+            try { ClaudeCodeProvider.OpenLogin(exe, SelectedAccount()); }
+            catch (Exception ex) { AccountNote(ex.Message, true); return; }
+            AccountNote(L.T("Nella finestra di Claude Code scrivi /login ed entra con l'utenza giusta, poi riapri l'elenco Account.",
+                            "In the Claude Code window type /login and sign in with the right account, then reopen the Account list."), false);
+        }
+
+        string Prompt(string text)
+        {
+            using (var f = new Form { Text = Text, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, ShowInTaskbar = false,
+                                      StartPosition = FormStartPosition.CenterParent, Font = Font, AutoScaleMode = AutoScaleMode.None,
+                                      ClientSize = new Size(S(400), S(150)), BackColor = Color.White })
+            {
+                var lbl = new Label { Text = text, AutoSize = false, Location = new Point(S(12), S(10)), Size = new Size(S(376), S(54)) };
+                var txt = new TextBox { Location = new Point(S(12), S(70)), Width = S(376) };
+                var ok = new Button { Text = "OK", DialogResult = DialogResult.OK, Location = new Point(S(196), S(108)), Size = new Size(S(92), S(28)) };
+                var cancel = new Button { Text = L.T("Annulla", "Cancel"), DialogResult = DialogResult.Cancel, Location = new Point(S(296), S(108)), Size = new Size(S(92), S(28)) };
+                f.Controls.AddRange(new Control[] { lbl, txt, ok, cancel });
+                f.AcceptButton = ok; f.CancelButton = cancel;
+                return f.ShowDialog(this) == DialogResult.OK ? txt.Text : null;
+            }
+        }
+
         void SaveAll()
         {
             AiSettings.Provider = rClaude.Checked ? AiSettings.Claude : rOpen.Checked ? AiSettings.OpenAi : AiSettings.ClaudeCode;
             AiSettings.ClaudeCodeModel = cCodeModel.SelectedIndex == 0 ? "" : cCodeModel.Text.Trim();
+            AiSettings.ClaudeCodeConfig = SelectedAccount();
             AiSettings.ClaudeKey = tClaudeKey.Text.Trim();
             AiSettings.ClaudeModel = cClaudeModel.Text.Trim().Length > 0 ? cClaudeModel.Text.Trim() : ClaudeProvider.DefaultModel;
             AiSettings.OpenAiUrl = tUrl.Text.Trim(); AiSettings.OpenAiKey = tKey.Text.Trim(); AiSettings.OpenAiModel = tModel.Text.Trim();
