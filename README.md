@@ -1,6 +1,6 @@
 # Statistiche CorbolImg
 
-Aggiornato il 2026-11-22 (UTC) dalla GitHub Action *Statistiche download*.
+Aggiornato il 2026-11-23 (UTC) dalla GitHub Action *Statistiche download*.
 
 ## Download totali per file
 
@@ -22,6 +22,7 @@ Aggiornato il 2026-11-22 (UTC) dalla GitHub Action *Statistiche download*.
 
 | Giorno | Nuovi | Totale |
 |---|---:|---:|
+| 2026-11-23 | 0 | 30 |
 | 2026-11-22 | 0 | 30 |
 | 2026-11-21 | 0 | 30 |
 | 2026-11-20 | 4 | 30 |
@@ -43,6 +44,7 @@ Aggiornato il 2026-11-22 (UTC) dalla GitHub Action *Statistiche download*.
 
 | Giorno | Visite | Visitatori unici | Clone | Clone unici |
 |---|---:|---:|---:|---:|
+| 2026-11-22 | 0 | 0 | 15 | 10 |
 | 2026-11-21 | 0 | 0 | 15 | 9 |
 | 2026-11-20 | 0 | 0 | 6 | 5 |
 | 2026-11-19 | 0 | 0 | 33 | 17 |
