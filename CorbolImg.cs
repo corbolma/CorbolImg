@@ -54,9 +54,29 @@ namespace CorbolImg
             var paths = args.Skip(convert ? 1 : 0).Where(a => !a.StartsWith("/")).ToArray();
 
             context = new ApplicationContext();
+            StartLink();
             if (convert) OpenConverter(paths);
             else OpenViewer(paths);
             Application.Run(context);
+        }
+
+        // Comandi dalle altre app Corbol (CorbolLink.cs): open apre un visualizzatore, convert il convertitore
+        static void StartLink()
+        {
+            Corbol.Link.Start("CorbolImg", L.T);
+            Corbol.Link.Handle("open", delegate (List<string> a)
+            {
+                var v = OpenViewer(a.Where(x => x.Trim().Length > 0).ToList());
+                v.Activate();
+                return "ok";
+            });
+            Corbol.Link.Handle("convert", delegate (List<string> a)
+            {
+                OpenConverter(a.Where(x => x.Trim().Length > 0).ToList());
+                if (converter != null) converter.Activate();
+                return "ok";
+            });
+            Corbol.Link.Ready();
         }
 
         // L'app resta aperta finché c'è almeno una finestra (visualizzatore o convertitore).

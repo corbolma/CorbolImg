@@ -718,6 +718,7 @@ namespace CorbolImg
                 Mi(cCopy, delegate { CopyCurrent(); }),
                 Mi(cPaste, delegate { Paste(); }),
                 Mi(cFolder, delegate { if (Current != null) Util.SelectInExplorer(Current); }),
+                Corbol.Link.OpenInMenu(() => Current != null ? new[] { Current } : null),
                 new ToolStripSeparator(),
                 Mi(cRotL, delegate { Rotate(-1); }),
                 Mi(cRotR, delegate { Rotate(1); }),
