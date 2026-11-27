@@ -1,11 +1,12 @@
 # Statistiche CorbolImg
 
-Aggiornato il 2026-11-26 (UTC) dalla GitHub Action *Statistiche download*.
+Aggiornato il 2026-11-27 (UTC) dalla GitHub Action *Statistiche download*.
 
 ## Download totali per file
 
 | Versione | File | Download |
 |---|---|---:|
+| v1.9.0 | CorbolImg-Setup-1.9.0.exe | 2 |
 | v1.8.0 | CorbolImg-Setup-1.8.0.exe | 4 |
 | v1.7.1 | CorbolImg-Setup-1.7.1.exe | 3 |
 | v1.7.0 | CorbolImg-Setup-1.7.0.exe | 3 |
@@ -16,12 +17,13 @@ Aggiornato il 2026-11-26 (UTC) dalla GitHub Action *Statistiche download*.
 | v1.2.0 | AppImg-Setup-1.2.0.exe | 4 |
 | v1.1.0 | AppImg-Setup-1.1.0.exe | 3 |
 | v1.0.0 | AppImg-Setup-1.0.0.exe | 3 |
-| | **Totale** | **30** |
+| | **Totale** | **32** |
 
 ## Nuovi download per giorno (ultimi 30 giorni)
 
 | Giorno | Nuovi | Totale |
 |---|---:|---:|
+| 2026-11-27 | 2 | 32 |
 | 2026-11-26 | 0 | 30 |
 | 2026-11-25 | 0 | 30 |
 | 2026-11-24 | 0 | 30 |
@@ -47,6 +49,7 @@ Aggiornato il 2026-11-26 (UTC) dalla GitHub Action *Statistiche download*.
 
 | Giorno | Visite | Visitatori unici | Clone | Clone unici |
 |---|---:|---:|---:|---:|
+| 2026-11-26 | 0 | 0 | 29 | 16 |
 | 2026-11-25 | 0 | 0 | 1 | 1 |
 | 2026-11-24 | 0 | 0 | 12 | 8 |
 | 2026-11-23 | 0 | 0 | 3 | 2 |
